@@ -1,0 +1,26 @@
+# ----------------------------------------
+# Pages and screens: Page path and screen class
+# Account: awningdepot.co.uk
+# Property: GA4 - awningdepot.co.uk
+# ----------------------------------------
+# 
+# All Users
+# Start date: 20250101
+# End date: 20251231
+Page path and screen class,Views,Active users,Views per active user,Average engagement time per active user,Event count,Key events,Total revenue
+/awnings-sussex/,146,103,1.4174757281553398,53.15533980582524,751,12,0
+/awnings-essex/,91,63,1.4444444444444444,47.95238095238095,384,3,0
+/awnings-margate/,86,57,1.5087719298245614,60.50877192982456,366,9,0
+/awnings-hertfordshire/,73,55,1.3272727272727274,43.236363636363635,348,2,0
+/awnings-buckinghamshire/,64,46,1.391304347826087,77.76086956521739,319,6,0
+/awnings-ashford/,63,39,1.6153846153846154,46.743589743589745,341,4,0
+/awnings-surrey/,63,51,1.2352941176470589,51.745098039215684,312,10,0
+/awnings-ramsgate/,56,46,1.2173913043478262,38.69565217391305,299,3,0
+/awnings-herne-bay/,53,35,1.5142857142857142,40.114285714285714,258,3,0
+/awnings-dover/,52,30,1.7333333333333334,51.1,262,1,0
+/awnings-chatham/,48,31,1.5483870967741935,44.096774193548384,219,1,0
+/awnings-kent/,42,27,1.5555555555555556,36,167,4,0
+/awnings-bedfordshire/,38,29,1.3103448275862069,27.03448275862069,246,2,0
+/awnings-maidstone/,32,23,1.391304347826087,49.26086956521739,171,2,0
+/awnings-canterbury/,25,20,1.25,37.5,122,0,0
+/awnings-rochester/,19,16,1.1875,21.25,82,0,0

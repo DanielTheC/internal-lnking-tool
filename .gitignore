@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Env / local
+.env
+.env*.local
+
+# Debug / OS
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Large / generated data (add filenames here if push is rejected for size)
+all_inlinks.csv

@@ -1,0 +1,117 @@
+ShreyKat (Shrey) — Today at 4:45 AM
+While I'm aware SEO centric topics are important for the growth, I feel like we are immensely lagging behind in terms of evergreen content and stuff that would help establish a dedicated audience who keeps coming back for more. @DARTH SCORPIUS is working hard on establishing TV and Entertainment section but we need to dive deeper into the video games section as well, especially about games that we extensively play and are knowledgeable about. Quality in-depth features and controversial/polarising opinion pieces can help us grow organically and give the website more flair and personality.
+Danjolf (Dan) — Today at 4:47 AM
+I could be wrong, but it also seems like covering news that isn't release dates is usually a losing battle to the major sites covering the same thing
+I like the features idea
+[offline] - back Thursday — Today at 4:48 AM
+this is why we need to jump on trends as fast as possible and maintain exceptional quality. the reality is that we have a pool of exceptional writers, however, many fail to appropriate basic SEO techniques to ensure their articles discoverability on google.
+i agree with you re features/opinions but we cannot do this until we get back DA on our priority titles
+SolenneG — Today at 4:53 AM
+"I feel like we are immensely lagging behind in terms of evergreen content and stuff that would help establish a dedicated audience who keeps coming back for more."
+this is what SEO content should be
+SEO optimised, evergreen, longtail
+the kind of article that keeps on giving 
+ShreyKat (Shrey) — Today at 4:56 AM
+True. But whatever games we do cover for guides and SEO purpose, I feel like we should cover it extensively. Not just the trending topics. I could be wrong since SEO isn't my line of expertise, but covering a game from start to finish, every possible topic, could plant a more authentic perspective of our website to the audience and they be like "damn they have everything nicely put out, this should be my go to website for this game or that" just an example ofc but if we do this, there's also a chance that when something else breaks out or goes trending like a week, month or even a year after, we would already have that content ready on the website.
+[offline] - back Thursday — Today at 4:58 AM
+100% correct. its about having a healthy balance. but we must clear breaking content first and as quickly as possible as they have the potential to bring massive amounts of traffic to the site.
+Danjolf (Dan) — Today at 4:59 AM
+What about regular updates to guides on something like a strict 2 week basis? Wouldn't that cover the idea of priority on a game topic as well as maintain the SEO priority for a long time?
+ShreyKat (Shrey) — Today at 5:00 AM
+That's true Dan. But I don't think we should skimp out on news just because of competition. It's a different story if we are very late.
+[offline] - back Thursday — Today at 5:02 AM
+maintaining news content is central to maintaining the identity and credibility of our brand. GINX is a news site. not a guides site. we are working on getting a dedicated writer to bridge this gap; regardless tho, it shouldnt come at the expense of solid SEO practices
+Floof Mom (Rabia) — Today at 5:02 AM
+Well to sum it up, where our website is right now, here's what the ratio should be between the guides: news: features 8:3:1
+Danjolf (Dan) — Today at 5:03 AM
+I don't want to stop news at all, I'm just suggesting regularly updated guides on a single page if that's possible. Like if I were to cover a bunch of raid bosses in Pokemon GO and keep that updated every two weeks or so
+Floof Mom (Rabia) — Today at 5:05 AM
+that is important yes
+Danjolf (Dan) — Today at 5:07 AM
+Isn't the standard practice right now to right something new instead? Loadouts might be a good example. They always splinter views with each season, but would it be better to continue to updaate just one central, or is the short term better?
+Floof Mom (Rabia) — Today at 5:08 AM
+it depends, if you still have the authority like you are ranking #1, then update the existing one otherwise create a new one
+Coz google will first take like a couple of days to register the changes and by then the topic's trends might go down
+Danjolf (Dan) — Today at 5:11 AM
+That's definitely true, but if we register changes beforehand and change just enough in the article to maintain authority, wouldn't that be the first to pop up when trends go back up?
+Floof Mom (Rabia) — Today at 5:12 AM
+How would you do it before the balance changes actually happen
+SolenneG — Today at 5:12 AM
+I am with Dan here
+Floof Mom (Rabia) — Today at 5:13 AM
+I am partially with Dan here coz remember the redeem code story? It didn't perform well when we updated the existing one
+SolenneG — Today at 5:13 AM
+if it's an update in the content, don't create new pages. We'd just end up cannibalising our own content. Update the existing page as much as possible, keeping date as clear as possible
+Floof Mom (Rabia) — Today at 5:13 AM
+In most cases, yes update the ones that are there but sometimes you will need to create new pages as well
+@vky619 what's your opinion on this?
+vky619 — Today at 5:16 AM
+@Floof Mom (Rabia) Yes you need to create a page for the latest news
+Floof Mom (Rabia) — Today at 5:17 AM
+naa it's not about the news, we are talking about the updates like if a new update is there of a particular game
+SolenneG — Today at 5:18 AM
+@vky619 : it's not so much about news
+but guides
+vky619 — Today at 5:19 AM
+For the same version of game you can update the existing one. If version changes then a new one.
+Danjolf (Dan) — Today at 5:22 AM
+So for something like COD or even Diablo Immortal, should we keep one page updated even with a new season? Allow the slug to remain simple and just change the title to reflect season changes?
+vky619 — Today at 5:24 AM
+No @Danjolf (Dan)
+You need to create a new page for a new season
+Danjolf (Dan) — Today at 5:29 AM
+I can keep doing that, but won't those loadouts lose to places like Charlie Intel?
+vky619 — Today at 5:31 AM
+Sorry @Danjolf (Dan) Can you please share your thoughts in more details. 
+Danjolf (Dan) — Today at 5:38 AM
+Outlets like Charlie Intel for the COD example will continue to keep one main page updated season after season so that their guides always have authority when new seasons drop. I know that isn't possible for new games or new content and those all need entirely new pages, but for something like COD, I believe an evergreen loadout page might help, among other games of the same nature, could help
+vky619 — Today at 5:42 AM
+Yea you are right @Danjolf (Dan) you can do that.
+Danjolf (Dan) — Today at 5:46 AM
+I could test it on some of the loadouts we have already before the new season drops so I don't jump the gone too far, but would slugs be a problem for long term guides with specific seasons in them?
+vky619 — Today at 5:49 AM
+That why i said new page if season is included in the url slug.
+Danjolf (Dan) — Today at 5:56 AM
+I think nearly all of them are, so maybe when the new content plan for Season 4 of Warzone comes out we can try with new pages and continue with those until Warzone 2 comes out.
+I've been trying to build up Pokemon GO and it looks like we don't have most of the legendary pokemon guides. That's something I could test the evergreen updates on if that sounds ok?
+[offline] - back Thursday — Today at 5:57 AM
+we can probably prepare a landing page for cod warzone season 4 already btw
+i think its releasing 22 june
+thats next week wed
+SolenneG — Today at 5:59 AM
+sounds more than ok
+[offline] - back Thursday — Today at 5:59 AM
+we need someone to upkeep POGO and pokemon content. we used to have another writer doing it so im happy for you to take the reigns on that
+vky619 — Today at 5:59 AM
+Yes @Danjolf (Dan) we can try
+Danjolf (Dan) — Today at 6:02 AM
+The guides seem to be doing pretty well for the articles ive been doing on Pokemon GO, but the news is still tough the win priority on. Is that something I just need to get out asap or it falls flat?
+[offline] - back Thursday — Today at 6:04 AM
+we shouldnt abandon news entirely. if its hot off the press, we should cover it. if we're late, then yes it pretty much does nothing for us
+UNLESS its an entertainment story. we find twitch/youtube scandals are still fine to push even if its a day late because the news propagates primarily on FB (which takes time)
+Danjolf (Dan) — Today at 6:08 AM
+I’m just gonna leave Pokémon go Twitter notifications on then so i can just speed run news if possible on that at least. I think they usually release news at like 4 or 5pm my time
+[offline] - back Thursday — Today at 6:09 AM
+sweet. yeah dw we're aware that theres a bit of a gap between the times US crew sign off and AM crew sign on
+its arguably a major factor affecting our timeliness but not the only factor
+Danjolf (Dan) — Today at 6:15 AM
+I can definitely work faster on news going forward, especially for the later stuff on EST
+[offline] - back Thursday — Today at 6:16 AM
+thanks man, we appreciate it. we are a small team but if we work together we can make magic happen
+Danjolf (Dan) — Today at 6:24 AM
+Side question, but are we planning on covering Monster Hunter Rise?
+[offline] - back Thursday — Today at 6:26 AM
+we can trial it im sure yes
+it releases 30 june?
+Danjolf (Dan) — Today at 6:27 AM
+Yeah it's the 30th. I wonder if they're giving out press access
+[offline] - back Thursday — Today at 6:27 AM
+ive added it to trello. we should get a landing page up
+Danjolf (Dan) — Today at 6:28 AM
+They are capcom owned right?
+[offline] - back Thursday — Today at 6:28 AM
+yes they are
+vky619 — Today at 6:28 AM
+I am going for small snacks break
+Danjolf (Dan) — Today at 6:46 AM
+I might have a contact I can pull which I'm trying now, but fingers crossed it works

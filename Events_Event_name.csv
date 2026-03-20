@@ -1,0 +1,31 @@
+# ----------------------------------------
+# Events: Event name
+# Account: Ten10
+# Property: Ten10 GA4
+# ----------------------------------------
+# 
+# All Users
+# Start date: 20251015
+# End date: 20260112
+Event name,Event count,Total users,Event count per active user,Total revenue
+page_view,40242,14950,2.7018933798845173,0
+user_engagement,33582,11589,2.911818260643371,0
+session_start,18390,14859,1.2430715154792484,0
+scroll,15693,6406,2.455484274761383,0
+first_visit,13320,13068,1.019283746556474,0
+form_submit,7931,888,8.941375422773394,0
+form_start,6238,1016,6.139763779527559,0
+click_contact,942,533,1.7773584905660378,0
+logo_social_clicks,340,277,1.227436823104693,0
+tenology_clicks,241,144,1.6736111111111112,0
+click,188,140,1.3428571428571427,0
+email_click,125,75,1.6666666666666667,0
+view_search_results,94,67,1.4029850746268657,0
+content_clicks,90,51,1.7647058823529411,0
+hs_menu_clicks,43,20,2.15,0
+gform_submission,37,35,1.0571428571428572,0
+file_download,30,26,1.1538461538461537,0
+wp_side_menu_clicks,28,14,2,0
+hubspot_submission,3,1,3,0
+wp_cta_click,2,2,1,0
+hs_accordion,1,1,1,0
