@@ -12,7 +12,8 @@ export async function crawlSite(options: CrawlOptions): Promise<PageData[]> {
     startUrls,
     userAgent,
     followLinks = true,
-    delayMs = 250
+    delayMs = 250,
+    requestTimeoutMs = 15000
   } = options;
   const startDomain = normaliseUrl(domain);
   if (!startDomain) {
@@ -47,7 +48,7 @@ export async function crawlSite(options: CrawlOptions): Promise<PageData[]> {
 
       const res = await axios.get<string>(normalised, {
         maxRedirects: 5,
-        timeout: 15000,
+        timeout: requestTimeoutMs,
         // Some sites return 3xx/4xx with HTML we can still parse.
         validateStatus: (s) => s >= 200 && s < 500,
         headers: {

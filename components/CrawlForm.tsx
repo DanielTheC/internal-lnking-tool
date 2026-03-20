@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { KeywordMapping } from "@/types";
 import KeywordMappingInput from "@/components/KeywordMappingInput";
+import { parseGscCsvToKeywordMap } from "@/lib/gsc-csv";
 
 type Props = {
   onAnalyse: (payload: {
@@ -12,6 +13,10 @@ type Props = {
     keywordMappings: KeywordMapping[];
     userAgent?: string;
     sitemapOnly?: boolean;
+    gscByKeyword?: Record<
+      string,
+      { impressions: number; clicks: number; position?: number }
+    >;
   }) => void;
   isLoading: boolean;
 };
@@ -25,6 +30,14 @@ export default function CrawlForm({ onAnalyse, isLoading }: Props) {
   ]);
   const [userAgent, setUserAgent] = useState("");
   const [sitemapOnly, setSitemapOnly] = useState(false);
+  const [gscByKeyword, setGscByKeyword] = useState<
+    Record<
+      string,
+      { impressions: number; clicks: number; position?: number }
+    >
+  >({});
+  const [gscFileLabel, setGscFileLabel] = useState<string | null>(null);
+  const [gscParseError, setGscParseError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +47,9 @@ export default function CrawlForm({ onAnalyse, isLoading }: Props) {
       maxPages: typeof maxPages === "number" ? maxPages : undefined,
       keywordMappings,
       userAgent: userAgent || undefined,
-      sitemapOnly
+      sitemapOnly,
+      gscByKeyword:
+        Object.keys(gscByKeyword).length > 0 ? gscByKeyword : undefined
     });
   };
 
@@ -84,7 +99,13 @@ export default function CrawlForm({ onAnalyse, isLoading }: Props) {
             className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <p className="mt-1 text-xs text-slate-400">
-            Limits total pages crawled (max 500).
+            Max 500. On{" "}
+            <span className="font-medium text-slate-300">Vercel Hobby</span>{" "}
+            each request is limited to ~10s, so large limits often time out —
+            use{" "}
+            <span className="font-medium text-slate-300">Vercel Pro</span> for
+            longer runs (or run <code className="rounded bg-slate-800 px-1">npm run dev</code>{" "}
+            locally).
           </p>
         </div>
       </div>
@@ -113,6 +134,70 @@ export default function CrawlForm({ onAnalyse, isLoading }: Props) {
             <span>Use sitemap URLs only</span>
           </label>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-100">
+              Search Console (optional)
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-400">
+              Export <strong>Performance → Queries</strong> as CSV from GSC
+              and upload. Rows are matched to your <strong>keyword</strong>{" "}
+              (case-insensitive) to boost sorting scores.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="cursor-pointer rounded-md border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-100 hover:border-slate-500">
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file) return;
+                  setGscParseError(null);
+                  try {
+                    const text = await file.text();
+                    const map = parseGscCsvToKeywordMap(text);
+                    setGscByKeyword(map);
+                    setGscFileLabel(
+                      `${file.name} · ${Object.keys(map).length} queries`
+                    );
+                  } catch (err) {
+                    setGscByKeyword({});
+                    setGscFileLabel(null);
+                    setGscParseError(
+                      err instanceof Error ? err.message : "Invalid CSV"
+                    );
+                  }
+                }}
+              />
+              Choose CSV
+            </label>
+            {gscFileLabel && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGscByKeyword({});
+                  setGscFileLabel(null);
+                  setGscParseError(null);
+                }}
+                className="text-xs text-slate-400 hover:text-red-400"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+        {gscFileLabel && (
+          <p className="mt-2 text-xs text-emerald-400">{gscFileLabel}</p>
+        )}
+        {gscParseError && (
+          <p className="mt-2 text-xs text-red-400">{gscParseError}</p>
+        )}
       </div>
 
       <KeywordMappingInput

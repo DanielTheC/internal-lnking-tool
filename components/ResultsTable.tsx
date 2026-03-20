@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import type { AnalyseResponseBody, OpportunityResult } from "@/types";
 
+const TABLE_COL_COUNT = 11;
+
 type Props = {
   data: AnalyseResponseBody | null;
 };
@@ -41,6 +43,15 @@ export default function ResultsTable({ data }: Props) {
       });
   }, [data, keywordFilter, statusFilter, sortKey, sortAsc]);
 
+  const gscQueryCount = useMemo(() => {
+    if (!data) return 0;
+    return new Set(
+      data.results
+        .filter((r) => r.gscImpressions != null)
+        .map((r) => r.keyword.trim().toLowerCase())
+    ).size;
+  }, [data]);
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortAsc(!sortAsc);
@@ -60,6 +71,9 @@ export default function ResultsTable({ data }: Props) {
       "sourceTitle",
       "destinationUrl",
       "snippet",
+      "gscImpressions",
+      "gscClicks",
+      "gscPosition",
       "status",
       "notes"
     ];
@@ -108,6 +122,16 @@ export default function ResultsTable({ data }: Props) {
             <span className="font-semibold">Opportunities found:</span>{" "}
             {data.totalOpportunitiesFound}
           </p>
+          {gscQueryCount > 0 && (
+            <p>
+              <span className="font-semibold">GSC weighting:</span>{" "}
+              <span className="text-slate-400">
+                {gscQueryCount} quer
+                {gscQueryCount === 1 ? "y" : "ies"} matched — score includes
+                demand boost
+              </span>
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -120,11 +144,12 @@ export default function ResultsTable({ data }: Props) {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-44 rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="min-w-[11rem] max-w-[16rem] rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">All statuses</option>
             <option value="Opportunity found">Opportunity found</option>
-            <option value="Already linked">Already linked</option>
+            <option value="Strong link">Strong link</option>
+            <option value="Weak anchor">Weak anchor</option>
             <option value="Source equals destination">
               Source equals destination
             </option>
@@ -175,6 +200,15 @@ export default function ResultsTable({ data }: Props) {
                 Destination URL
               </th>
               <th className="px-3 py-2">Snippet</th>
+              <th className="px-3 py-2" title="Google Search Console">
+                GSC impr.
+              </th>
+              <th className="px-3 py-2" title="Google Search Console">
+                GSC clicks
+              </th>
+              <th className="px-3 py-2" title="Avg. position (imported)">
+                GSC pos.
+              </th>
               <th
                 className="cursor-pointer px-3 py-2"
                 onClick={() => handleSort("status")}
@@ -227,16 +261,35 @@ export default function ResultsTable({ data }: Props) {
                   <td className="px-3 py-2 align-top text-slate-200">
                     {r.snippet ?? "–"}
                   </td>
+                  <td className="px-3 py-2 align-top tabular-nums text-slate-300">
+                    {r.gscImpressions != null
+                      ? r.gscImpressions.toLocaleString()
+                      : "–"}
+                  </td>
+                  <td className="px-3 py-2 align-top tabular-nums text-slate-300">
+                    {r.gscClicks != null
+                      ? r.gscClicks.toLocaleString()
+                      : "–"}
+                  </td>
+                  <td className="px-3 py-2 align-top tabular-nums text-slate-300">
+                    {r.gscPosition != null
+                      ? r.gscPosition.toFixed(1)
+                      : "–"}
+                  </td>
                   <td className="px-3 py-2 align-top">
                     <div className="flex items-center justify-between gap-2">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                           r.status === "Opportunity found"
                             ? "bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/40"
-                            : r.status === "Already linked"
-                            ? "bg-slate-500/10 text-slate-300 ring-1 ring-slate-500/40"
+                            : r.status === "Strong link"
+                            ? "bg-cyan-500/10 text-cyan-200 ring-1 ring-cyan-500/40"
+                            : r.status === "Weak anchor"
+                            ? "bg-orange-500/10 text-orange-200 ring-1 ring-orange-500/40"
                             : r.status === "Keyword not found"
                             ? "bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/40"
+                            : r.status === "Linked to different URL"
+                            ? "bg-rose-500/10 text-rose-200 ring-1 ring-rose-500/40"
                             : "bg-purple-500/10 text-purple-300 ring-1 ring-purple-500/40"
                         }`}
                       >
@@ -265,7 +318,10 @@ export default function ResultsTable({ data }: Props) {
                 </tr>
                 {expandedIndex === idx && r.snippet && (
                   <tr className="bg-slate-950/80">
-                    <td colSpan={6} className="px-3 pb-3 pt-1 text-[11px]">
+                    <td
+                      colSpan={TABLE_COL_COUNT}
+                      className="px-3 pb-3 pt-1 text-[11px]"
+                    >
                       <div className="rounded-md border border-slate-800 bg-slate-900/80 p-3 text-slate-100">
                         <div
                           dangerouslySetInnerHTML={{
@@ -281,7 +337,7 @@ export default function ResultsTable({ data }: Props) {
             {!filtered.length && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={TABLE_COL_COUNT}
                   className="px-3 py-6 text-center text-sm text-slate-400"
                 >
                   No results match the current filters.

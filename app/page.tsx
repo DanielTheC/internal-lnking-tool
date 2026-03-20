@@ -108,9 +108,10 @@ export default function HomePage() {
             disabled={!presetName || !lastPayload}
             onClick={() => {
               if (!presetName || !lastPayload) return;
+              const { gscByKeyword: _g, ...payloadWithoutGsc } = lastPayload;
               const next = [
                 ...presets.filter((p) => p.name !== presetName),
-                { name: presetName, payload: lastPayload }
+                { name: presetName, payload: payloadWithoutGsc }
               ];
               persistPresets(next);
             }}
