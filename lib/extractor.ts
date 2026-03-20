@@ -13,7 +13,7 @@ function parseRobotsDirectives($: cheerio.CheerioAPI): RobotsDirectives {
   return directives;
 }
 
-function extractMainContent($: cheerio.CheerioAPI): cheerio.Cheerio<cheerio.Element> {
+function extractMainContent($: cheerio.CheerioAPI) {
   const main = $("main");
   if (main.length) return main;
   const article = $("article");
