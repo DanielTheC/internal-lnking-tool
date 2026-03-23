@@ -81,6 +81,8 @@ export type AnalyseRequestBody = {
   sitemapOnly?: boolean;
   /** Optional: keyed by normalised query string (lowercase), from GSC CSV import. */
   gscByKeyword?: Record<string, GscKeywordMetrics>;
+  /** New pages per /api/crawl/batch call when using chunked crawl (default 15). */
+  batchPageLimit?: number;
 };
 
 export type AnalyseResponseBody = {
@@ -88,5 +90,29 @@ export type AnalyseResponseBody = {
   totalKeywordMappingsAnalysed: number;
   totalOpportunitiesFound: number;
   results: OpportunityResult[];
+};
+
+/** Serialisable crawl frontier for chunked /api/crawl/batch requests. */
+export type SerializableCrawlState = {
+  queue: string[];
+  visited: string[];
+};
+
+export type CrawlBatchRequestBody = {
+  domain: string;
+  sitemapUrl?: string;
+  maxPages: number;
+  userAgent?: string;
+  sitemapOnly?: boolean;
+  alreadyCollected: number;
+  /** Soft cap on new PageData rows per invocation (stay under serverless timeouts). Default 15 on the server. */
+  batchPageLimit?: number;
+  state: SerializableCrawlState | null;
+};
+
+export type CrawlBatchResponseBody = {
+  newPages: PageData[];
+  state: SerializableCrawlState;
+  complete: boolean;
 };
 

@@ -20,3 +20,4 @@ Thumbs.db
 
 # Large / generated data (add filenames here if push is rejected for size)
 all_inlinks.csv
+*.zip

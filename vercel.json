@@ -3,6 +3,9 @@
   "functions": {
     "app/api/analyse/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/crawl/batch/route.ts": {
+      "maxDuration": 300
     }
   }
 }

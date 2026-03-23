@@ -1,34 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import type { KeywordMapping } from "@/types";
+import type { AnalyseRequestBody, KeywordMapping } from "@/types";
 import KeywordMappingInput from "@/components/KeywordMappingInput";
 import { parseGscCsvToKeywordMap } from "@/lib/gsc-csv";
+import {
+  USER_AGENT_PRESETS,
+  USER_AGENT_PRESET_CUSTOM,
+  resolveUserAgentForPreset
+} from "@/lib/user-agent-presets";
 
 type Props = {
-  onAnalyse: (payload: {
-    domain: string;
-    sitemapUrl?: string;
-    maxPages?: number;
-    keywordMappings: KeywordMapping[];
-    userAgent?: string;
-    sitemapOnly?: boolean;
-    gscByKeyword?: Record<
-      string,
-      { impressions: number; clicks: number; position?: number }
-    >;
-  }) => void;
+  onAnalyse: (payload: AnalyseRequestBody) => void;
   isLoading: boolean;
+  crawlProgress?: string | null;
 };
 
-export default function CrawlForm({ onAnalyse, isLoading }: Props) {
+export default function CrawlForm({
+  onAnalyse,
+  isLoading,
+  crawlProgress
+}: Props) {
   const [domain, setDomain] = useState("");
   const [sitemapUrl, setSitemapUrl] = useState("");
   const [maxPages, setMaxPages] = useState<number | "">(50);
   const [keywordMappings, setKeywordMappings] = useState<KeywordMapping[]>([
     { keyword: "", destinationUrl: "", matchMode: "phrase" }
   ]);
-  const [userAgent, setUserAgent] = useState("");
+  const [userAgentPresetId, setUserAgentPresetId] = useState("default");
+  const [customUserAgent, setCustomUserAgent] = useState("");
   const [sitemapOnly, setSitemapOnly] = useState(false);
   const [gscByKeyword, setGscByKeyword] = useState<
     Record<
@@ -38,6 +38,7 @@ export default function CrawlForm({ onAnalyse, isLoading }: Props) {
   >({});
   const [gscFileLabel, setGscFileLabel] = useState<string | null>(null);
   const [gscParseError, setGscParseError] = useState<string | null>(null);
+  const [batchPageLimit, setBatchPageLimit] = useState(15);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,10 +47,14 @@ export default function CrawlForm({ onAnalyse, isLoading }: Props) {
       sitemapUrl: sitemapUrl || undefined,
       maxPages: typeof maxPages === "number" ? maxPages : undefined,
       keywordMappings,
-      userAgent: userAgent || undefined,
+      userAgent: resolveUserAgentForPreset(
+        userAgentPresetId,
+        customUserAgent
+      ),
       sitemapOnly,
       gscByKeyword:
-        Object.keys(gscByKeyword).length > 0 ? gscByKeyword : undefined
+        Object.keys(gscByKeyword).length > 0 ? gscByKeyword : undefined,
+      batchPageLimit
     });
   };
 
@@ -99,29 +104,71 @@ export default function CrawlForm({ onAnalyse, isLoading }: Props) {
             className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <p className="mt-1 text-xs text-slate-400">
-            Max 500. On{" "}
-            <span className="font-medium text-slate-300">Vercel Hobby</span>{" "}
-            each request is limited to ~10s, so large limits often time out —
-            use{" "}
-            <span className="font-medium text-slate-300">Vercel Pro</span> for
-            longer runs (or run <code className="rounded bg-slate-800 px-1">npm run dev</code>{" "}
-            locally).
+            Max 500. Crawls with <span className="text-slate-300">more than 15 pages</span>{" "}
+            use <strong>chunked requests</strong> so each call stays within
+            serverless time limits (recommended on Vercel Hobby).
           </p>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="md:col-span-2">
+        <div className="md:col-span-1">
           <label className="block text-sm font-medium text-slate-200">
-            User-Agent (optional)
+            Pages per request (chunked crawl)
           </label>
           <input
-            type="text"
-            placeholder="Leave blank to use default browser-like User-Agent"
-            value={userAgent}
-            onChange={(e) => setUserAgent(e.target.value)}
-            className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            type="number"
+            min={5}
+            max={40}
+            value={batchPageLimit}
+            onChange={(e) =>
+              setBatchPageLimit(
+                Math.min(40, Math.max(5, Number(e.target.value) || 15))
+              )
+            }
+            className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
+          <p className="mt-1 text-xs text-slate-400">
+            Lower if batches time out; higher = fewer round trips (Pro only helps
+            per-request ceiling).
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="md:col-span-2 space-y-2">
+          <label className="block text-sm font-medium text-slate-200">
+            User-Agent
+          </label>
+          <select
+            value={userAgentPresetId}
+            onChange={(e) => setUserAgentPresetId(e.target.value)}
+            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            {USER_AGENT_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          {userAgentPresetId === USER_AGENT_PRESET_CUSTOM && (
+            <div>
+              <label className="sr-only" htmlFor="custom-user-agent">
+                Custom User-Agent string
+              </label>
+              <input
+                id="custom-user-agent"
+                type="text"
+                placeholder="Paste a full User-Agent string"
+                value={customUserAgent}
+                onChange={(e) => setCustomUserAgent(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          )}
+          <p className="text-xs text-slate-400">
+            Some sites treat crawlers differently; try another preset if requests fail.
+          </p>
         </div>
         <div className="flex items-end">
           <label className="inline-flex items-center gap-2 text-sm text-slate-200">
@@ -204,6 +251,12 @@ export default function CrawlForm({ onAnalyse, isLoading }: Props) {
         mappings={keywordMappings}
         onChange={setKeywordMappings}
       />
+
+      {crawlProgress && (
+        <p className="rounded-md border border-blue-500/30 bg-blue-950/40 px-3 py-2 text-sm text-blue-100">
+          {crawlProgress}
+        </p>
+      )}
 
       <div className="flex items-center justify-between gap-4 pt-2">
         <button

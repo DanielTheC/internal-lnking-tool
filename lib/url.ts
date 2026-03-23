@@ -1,5 +1,3 @@
-import { URL } from "url";
-
 const HTML_EXTENSIONS = ["", ".html", ".htm", "/"];
 
 export function normaliseUrl(rawUrl: string, baseDomain?: string): string | null {

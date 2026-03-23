@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import CrawlForm from "@/components/CrawlForm";
 import ResultsTable from "@/components/ResultsTable";
-import type { AnalyseResponseBody, AnalyseRequestBody } from "@/types";
+import type {
+  AnalyseResponseBody,
+  AnalyseRequestBody,
+  CrawlBatchResponseBody,
+  PageData,
+  SerializableCrawlState
+} from "@/types";
+import { buildAnalyseResponse } from "@/lib/build-analyse-response";
+import { cleanKeywordMappings } from "@/lib/clean-mappings";
+import { parseFailedFetchResponse } from "@/lib/parse-fetch-error";
 
 type Preset = {
   name: string;
@@ -17,6 +26,7 @@ export default function HomePage() {
   const [lastPayload, setLastPayload] = useState<AnalyseRequestBody | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [presetName, setPresetName] = useState("");
+  const [crawlProgress, setCrawlProgress] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -42,25 +52,97 @@ export default function HomePage() {
     setIsLoading(true);
     setError(null);
     setData(null);
+    setCrawlProgress(null);
     setLastPayload(payload);
     try {
-      const res = await fetch("/api/analyse", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error || "Failed to analyse site");
+      const cleanedMappings = cleanKeywordMappings(payload.keywordMappings);
+      if (cleanedMappings.length === 0) {
+        throw new Error(
+          "Add at least one keyword mapping with keyword and destination URL."
+        );
       }
-      const json = (await res.json()) as AnalyseResponseBody;
-      setData(json);
-    } catch (e: any) {
-      setError(e.message || "Unexpected error");
+
+      const maxPages = Math.min(
+        Math.max(payload.maxPages ?? 50, 1),
+        500
+      );
+      /** Above this, use /api/crawl/batch loops so each server call stays short (Vercel Hobby ~10s). */
+      const useChunked = maxPages > 15;
+
+      if (!useChunked) {
+        const res = await fetch("/api/analyse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...payload,
+            keywordMappings: cleanedMappings
+          })
+        });
+        if (!res.ok) {
+          throw new Error(await parseFailedFetchResponse(res));
+        }
+        const json = (await res.json()) as AnalyseResponseBody;
+        setData(json);
+        return;
+      }
+
+      const allPages: PageData[] = [];
+      let state: SerializableCrawlState | null = null;
+      let complete = false;
+      let batchN = 0;
+      const batchLimit = Math.min(
+        Math.max(payload.batchPageLimit ?? 15, 5),
+        40
+      );
+
+      while (!complete && batchN < 400) {
+        setCrawlProgress(
+          `Crawling… step ${batchN + 1} · ${allPages.length} pages collected (target ≤ ${maxPages})`
+        );
+        const res = await fetch("/api/crawl/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            domain: payload.domain,
+            sitemapUrl: payload.sitemapUrl,
+            maxPages,
+            userAgent: payload.userAgent,
+            sitemapOnly: payload.sitemapOnly,
+            alreadyCollected: allPages.length,
+            batchPageLimit: batchLimit,
+            state
+          })
+        });
+        if (!res.ok) {
+          throw new Error(await parseFailedFetchResponse(res));
+        }
+        const json = (await res.json()) as CrawlBatchResponseBody;
+        allPages.push(...json.newPages);
+        state = json.state;
+        complete = json.complete;
+        batchN++;
+      }
+
+      if (!complete) {
+        throw new Error(
+          "Crawl did not finish within the safety limit (400 batch steps). Try a smaller crawl limit, fewer sitemap URLs, or adjust pages per request."
+        );
+      }
+
+      setCrawlProgress(
+        `Analysing ${allPages.length} pages…`
+      );
+      const out = buildAnalyseResponse({
+        pages: allPages,
+        keywordMappings: cleanedMappings,
+        gscByKeyword: payload.gscByKeyword
+      });
+      setData(out);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unexpected error");
     } finally {
       setIsLoading(false);
+      setCrawlProgress(null);
     }
   };
 
@@ -122,7 +204,11 @@ export default function HomePage() {
         </div>
       </header>
 
-      <CrawlForm onAnalyse={handleAnalyse} isLoading={isLoading} />
+      <CrawlForm
+        onAnalyse={handleAnalyse}
+        isLoading={isLoading}
+        crawlProgress={crawlProgress}
+      />
 
       {error && (
         <div className="rounded-lg border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-100">
