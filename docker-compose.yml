@@ -1,0 +1,10 @@
+# Local Redis for the crawl worker (optional).
+#   docker compose up -d
+#   REDIS_URL=redis://127.0.0.1:6379 npm run dev
+#   REDIS_URL=redis://127.0.0.1:6379 npm run crawl-worker
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

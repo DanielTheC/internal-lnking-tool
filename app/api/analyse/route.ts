@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { AnalyseRequestBody, AnalyseResponseBody } from "@/types";
-import { crawlSite } from "@/lib/crawler";
-import { analysePagesForOpportunities } from "@/lib/analyser";
-import { parseSitemapUrls } from "@/lib/sitemap";
-import { normaliseUrl } from "@/lib/url";
-import { applyGscToResults } from "@/lib/gsc-merge";
-import { sanitizeGscByKeyword } from "@/lib/gsc-sanitize";
+import type { AnalyseRequestBody } from "@/types";
 import { cleanKeywordMappings } from "@/lib/clean-mappings";
+import { normaliseUrl } from "@/lib/url";
+import { runFullAnalyse } from "@/lib/run-full-analyse";
 
 /**
  * Serverless max run time (seconds). Vercel Hobby caps at ~10s regardless.
@@ -19,12 +15,9 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as AnalyseRequestBody;
     const {
       domain,
-      sitemapUrl,
-      maxPages = 100,
       keywordMappings,
-      userAgent,
-      sitemapOnly,
-      gscByKeyword: rawGsc
+      useWorkerQueue: _useWorkerQueue,
+      ...rest
     } = body;
 
     if (!domain || !keywordMappings || keywordMappings.length === 0) {
@@ -48,46 +41,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const limitedMaxPages = Math.min(Math.max(maxPages || 1, 1), 500);
-
-    const initialQueue: string[] = [];
-    if (sitemapUrl) {
-      const urls = await parseSitemapUrls(sitemapUrl, normalisedDomain);
-      initialQueue.push(...urls);
-    } else {
-      initialQueue.push(normalisedDomain);
-    }
-
-    // Vercel: no polite delay (would burn the ~10s Hobby limit); tighten HTTP timeout slightly.
-    const onVercel = process.env.VERCEL === "1";
-
-    const pages = await crawlSite({
-      domain: normalisedDomain,
-      sitemapUrl,
-      maxPages: limitedMaxPages,
-      startUrls: initialQueue,
-      userAgent,
-      followLinks: sitemapOnly ? false : true,
-      delayMs: onVercel ? 0 : 250,
-      requestTimeoutMs: onVercel ? 10000 : 15000
+    const response = await runFullAnalyse({
+      ...rest,
+      domain,
+      keywordMappings,
+      cleanedMappings
     });
-
-    let results = analysePagesForOpportunities(pages, cleanedMappings);
-
-    const gscByKeyword = sanitizeGscByKeyword(rawGsc);
-    if (gscByKeyword) {
-      results = applyGscToResults(results, gscByKeyword);
-    }
-
-    const response: AnalyseResponseBody = {
-      crawledPageCount: pages.length,
-      totalKeywordMappingsAnalysed: cleanedMappings.length,
-      totalOpportunitiesFound: results.filter(
-        (r) =>
-          r.status === "Opportunity found" || r.status === "Weak anchor"
-      ).length,
-      results
-    };
 
     return NextResponse.json(response);
   } catch (error) {

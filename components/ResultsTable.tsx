@@ -1,20 +1,31 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { AnalyseResponseBody, OpportunityResult } from "@/types";
+import { downloadJson } from "@/lib/run-history";
 
-const TABLE_COL_COUNT = 11;
+const TABLE_COL_COUNT = 12;
 
 type Props = {
   data: AnalyseResponseBody | null;
+  /** Base filename without extension (from domain) */
+  exportFilenameBase?: string;
 };
 
 type SortKey = keyof Pick<
   OpportunityResult,
-  "keyword" | "sourceUrl" | "destinationUrl" | "status" | "score"
+  | "keyword"
+  | "sourceUrl"
+  | "destinationUrl"
+  | "status"
+  | "score"
+  | "contextQuality"
 >;
 
-export default function ResultsTable({ data }: Props) {
+export default function ResultsTable({
+  data,
+  exportFilenameBase = "ilo-export"
+}: Props) {
   const [keywordFilter, setKeywordFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [sortKey, setSortKey] = useState<SortKey>("keyword");
@@ -66,6 +77,7 @@ export default function ResultsTable({ data }: Props) {
     const header = [
       "group",
       "score",
+      "contextQuality",
       "keyword",
       "sourceUrl",
       "sourceTitle",
@@ -92,9 +104,14 @@ export default function ResultsTable({ data }: Props) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "internal-link-opportunities.csv";
+    a.download = `${exportFilenameBase}-opportunities.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportJson = () => {
+    if (!data) return;
+    downloadJson(`${exportFilenameBase}-results.json`, data);
   };
 
   if (!data) return null;
@@ -132,6 +149,11 @@ export default function ResultsTable({ data }: Props) {
               </span>
             </p>
           )}
+          <p className="text-slate-400">
+            <span className="font-semibold text-slate-300">Context:</span>{" "}
+            0–1 score for whether the keyword sits in editorial paragraphs (&lt;p&gt;)
+            vs boilerplate (cookies, newsletter, etc.). Feeds into the main score.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -166,6 +188,13 @@ export default function ResultsTable({ data }: Props) {
           >
             Export CSV
           </button>
+          <button
+            type="button"
+            onClick={exportJson}
+            className="inline-flex items-center rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-100 shadow-sm hover:border-slate-500"
+          >
+            Export JSON
+          </button>
         </div>
       </div>
 
@@ -179,6 +208,13 @@ export default function ResultsTable({ data }: Props) {
                 onClick={() => handleSort("score")}
               >
                 Score
+              </th>
+              <th
+                className="cursor-pointer px-3 py-2"
+                title="Paragraph context: editorial vs boilerplate"
+                onClick={() => handleSort("contextQuality")}
+              >
+                Context
               </th>
               <th
                 className="cursor-pointer px-3 py-2"
@@ -219,9 +255,8 @@ export default function ResultsTable({ data }: Props) {
           </thead>
           <tbody>
             {filtered.map((r, idx) => (
-              <>
+              <Fragment key={idx}>
                 <tr
-                  key={idx}
                   className={
                     idx % 2 === 0 ? "bg-slate-900/60" : "bg-slate-900/30"
                   }
@@ -231,6 +266,11 @@ export default function ResultsTable({ data }: Props) {
                   </td>
                   <td className="px-3 py-2 align-top font-semibold text-slate-100">
                     {r.score}
+                  </td>
+                  <td className="px-3 py-2 align-top tabular-nums text-slate-300">
+                    {r.contextQuality != null
+                      ? r.contextQuality.toFixed(2)
+                      : "–"}
                   </td>
                   <td className="px-3 py-2 align-top font-medium">
                     {r.keyword}
@@ -332,7 +372,7 @@ export default function ResultsTable({ data }: Props) {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
             {!filtered.length && (
               <tr>

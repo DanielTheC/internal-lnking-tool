@@ -9,17 +9,24 @@ import {
   USER_AGENT_PRESET_CUSTOM,
   resolveUserAgentForPreset
 } from "@/lib/user-agent-presets";
+import { parsePathPrefixesField } from "@/lib/path-prefixes";
 
 type Props = {
   onAnalyse: (payload: AnalyseRequestBody) => void;
   isLoading: boolean;
   crawlProgress?: string | null;
+  /** Server has REDIS_URL — enables background worker option. */
+  queueEnabled?: boolean;
+  /** Incremental cache can be persisted (Redis or local .cache in dev). */
+  incrementalPersisted?: boolean;
 };
 
 export default function CrawlForm({
   onAnalyse,
   isLoading,
-  crawlProgress
+  crawlProgress,
+  queueEnabled = false,
+  incrementalPersisted = false
 }: Props) {
   const [domain, setDomain] = useState("");
   const [sitemapUrl, setSitemapUrl] = useState("");
@@ -39,9 +46,13 @@ export default function CrawlForm({
   const [gscFileLabel, setGscFileLabel] = useState<string | null>(null);
   const [gscParseError, setGscParseError] = useState<string | null>(null);
   const [batchPageLimit, setBatchPageLimit] = useState(15);
+  const [pathPrefixesText, setPathPrefixesText] = useState("");
+  const [useWorkerQueue, setUseWorkerQueue] = useState(false);
+  const [incremental, setIncremental] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const pathPrefixes = parsePathPrefixesField(pathPrefixesText);
     onAnalyse({
       domain,
       sitemapUrl: sitemapUrl || undefined,
@@ -54,7 +65,11 @@ export default function CrawlForm({
       sitemapOnly,
       gscByKeyword:
         Object.keys(gscByKeyword).length > 0 ? gscByKeyword : undefined,
-      batchPageLimit
+      batchPageLimit,
+      allowedPathPrefixes:
+        pathPrefixes.length > 0 ? pathPrefixes : undefined,
+      useWorkerQueue: queueEnabled && useWorkerQueue,
+      incremental
     });
   };
 
@@ -133,6 +148,85 @@ export default function CrawlForm({
             per-request ceiling).
           </p>
         </div>
+      </div>
+
+      {queueEnabled && (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/20 px-4 py-3">
+          <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-200">
+            <input
+              type="checkbox"
+              checked={useWorkerQueue}
+              onChange={(e) => setUseWorkerQueue(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span>
+              <span className="font-semibold text-emerald-200">
+                Redis background worker
+              </span>
+              <span className="block text-xs text-slate-400">
+                Runs the crawl on a long-lived worker process (no 400-step browser
+                limit, better for large sites). Requires{" "}
+                <code className="text-slate-300">REDIS_URL</code> and{" "}
+                <code className="text-slate-300">npm run crawl-worker</code>{" "}
+                running separately.
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-sky-500/30 bg-sky-950/20 px-4 py-3">
+        <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            checked={incremental}
+            onChange={(e) => setIncremental(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-sky-600 focus:ring-sky-500"
+          />
+          <span>
+            <span className="font-semibold text-sky-200">
+              Incremental crawl (ETag / Last-Modified)
+            </span>
+            <span className="block text-xs text-slate-400">
+              Sends conditional GETs and reuses cached page snapshots on{" "}
+              <code className="text-slate-300">304 Not Modified</code>. Persists per
+              domain in{" "}
+              <code className="text-slate-300">REDIS_URL</code> (recommended) or{" "}
+              <code className="text-slate-300">.cache/crawl-incremental/</code> in local
+              dev.
+              {!incrementalPersisted && (
+                <span className="mt-1 block text-amber-400/95">
+                  No cache persistence on this server — incremental only applies within
+                  one run (set <code className="text-slate-300">REDIS_URL</code> or use
+                  local dev for cross-run reuse).
+                </span>
+              )}
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+        <label className="block text-sm font-medium text-slate-200">
+          Path prefixes (optional — limit crawl to folders)
+        </label>
+        <textarea
+          value={pathPrefixesText}
+          onChange={(e) => setPathPrefixesText(e.target.value)}
+          rows={3}
+          placeholder={"/blog\n/sale\n/mens-boots"}
+          className="mt-2 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <p className="mt-2 text-xs text-slate-400">
+          One path per line or comma-separated. Only URLs whose path starts with one of these
+          prefixes are fetched and followed (e.g. <code className="text-slate-300">/blog</code>{" "}
+          matches <code className="text-slate-300">/blog</code> and{" "}
+          <code className="text-slate-300">/blog/post-slug</code>). Leave empty to crawl the
+          whole site. Use <code className="text-slate-300">/</code> alone for full site when
+          you also use a sitemap. With a sitemap, URLs are filtered to these prefixes; if none
+          match, the crawl starts from <code className="text-slate-300">https://your-domain…/prefix</code>{" "}
+          for each prefix.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

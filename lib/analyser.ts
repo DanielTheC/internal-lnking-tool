@@ -5,6 +5,7 @@ import type {
   PageData
 } from "@/types";
 import { normaliseUrl, urlsEqual } from "./url";
+import { getKeywordContextFromBlocks } from "./paragraph-context";
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -171,6 +172,8 @@ function computeScore(args: {
   path: string;
   hasExistingLinks: boolean;
   status: OpportunityStatus;
+  /** 0–1: keyword in editorial paragraph vs boilerplate (optional). */
+  paragraphContextQuality?: number;
 }): number {
   // Base on status
   let score =
@@ -184,6 +187,14 @@ function computeScore(args: {
 
   // Boost by number of occurrences (cap at +3)
   score += Math.min(args.matchCount, 3);
+
+  // Paragraph-level context: real sentences vs boilerplate (0–3 extra points)
+  if (
+    args.paragraphContextQuality != null &&
+    Number.isFinite(args.paragraphContextQuality)
+  ) {
+    score += Math.round(args.paragraphContextQuality * 3);
+  }
 
   // Slightly boost "content-looking" paths
   const lower = args.path.toLowerCase();
@@ -265,6 +276,21 @@ export function analysePagesForOpportunities(
         mapping.matchMode
       );
 
+      const blocksForContext =
+        page.contentBlocks && page.contentBlocks.length > 0
+          ? page.contentBlocks
+          : [searchText];
+
+      const keywordContext =
+        positions.length > 0
+          ? getKeywordContextFromBlocks(
+              blocksForContext,
+              mapping.keyword,
+              mapping.matchMode
+            )
+          : null;
+      const paragraphQ = keywordContext?.bestMatchContextQuality;
+
       const linkFlags = anchorsWithKeyword(
         page,
         mapping.keyword,
@@ -283,23 +309,26 @@ export function analysePagesForOpportunities(
           anchorTier === "strong" ? "Strong link" : "Weak anchor";
         const anchorPreview =
           getAnchorTextsToDestination(page, destination)[0] ?? null;
+        const bodySnippet =
+          anchorTier === "weak" && positions.length > 0
+            ? keywordContext?.snippet ?? buildSnippet(searchText, positions[0])
+            : anchorPreview;
         results.push({
           keyword: mapping.keyword,
           group: mapping.group,
           sourceUrl,
           sourceTitle: page.title || page.metaTitle || page.h1,
           destinationUrl: destination,
-          snippet:
-            anchorTier === "weak" && positions.length > 0
-              ? buildSnippet(searchText, positions[0])
-              : anchorPreview,
+          snippet: bodySnippet,
           status,
           score: computeScore({
             matchCount: positions.length,
             path: new URL(sourceUrl).pathname,
             hasExistingLinks: true,
-            status
+            status,
+            paragraphContextQuality: paragraphQ
           }),
+          contextQuality: paragraphQ,
           cannibalisationRisk: Boolean(keywordHasMultipleDests || groupHasMultipleDests)
         });
         continue;
@@ -322,26 +351,31 @@ export function analysePagesForOpportunities(
 
       if (linkFlags.toOther) {
         const status: OpportunityStatus = "Linked to different URL";
+        const snippet =
+          keywordContext?.snippet ?? buildSnippet(searchText, positions[0]);
         results.push({
           keyword: mapping.keyword,
           group: mapping.group,
           sourceUrl,
           sourceTitle: page.title || page.metaTitle || page.h1,
           destinationUrl: destination,
-          snippet: buildSnippet(searchText, positions[0]),
+          snippet,
           status,
           score: computeScore({
             matchCount: positions.length,
             path: new URL(sourceUrl).pathname,
             hasExistingLinks: page.outgoingInternalLinks.length > 0,
-            status
+            status,
+            paragraphContextQuality: paragraphQ
           }),
+          contextQuality: paragraphQ,
           cannibalisationRisk: true
         });
         continue;
       }
 
-      const snippet = buildSnippet(searchText, positions[0]);
+      const snippet =
+        keywordContext?.snippet ?? buildSnippet(searchText, positions[0]);
 
       const status: OpportunityStatus = "Opportunity found";
       results.push({
@@ -356,8 +390,10 @@ export function analysePagesForOpportunities(
           matchCount: positions.length,
           path: new URL(sourceUrl).pathname,
           hasExistingLinks: page.outgoingInternalLinks.length > 0,
-          status
+          status,
+          paragraphContextQuality: paragraphQ
         }),
+        contextQuality: paragraphQ,
         cannibalisationRisk: Boolean(keywordHasMultipleDests || groupHasMultipleDests)
       });
     }

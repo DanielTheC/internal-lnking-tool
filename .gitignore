@@ -9,6 +9,9 @@ out/
 .env
 .env*.local
 
+# Local incremental crawl cache (ETag / Last-Modified snapshots)
+.cache/
+
 # Debug / OS
 npm-debug.log*
 .DS_Store

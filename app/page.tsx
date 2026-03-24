@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import CrawlForm from "@/components/CrawlForm";
 import ResultsTable from "@/components/ResultsTable";
+import RunDiffPanel from "@/components/RunDiffPanel";
+import WorkspaceJumpNav from "@/components/WorkspaceJumpNav";
 import type {
   AnalyseResponseBody,
   AnalyseRequestBody,
@@ -13,6 +16,19 @@ import type {
 import { buildAnalyseResponse } from "@/lib/build-analyse-response";
 import { cleanKeywordMappings } from "@/lib/clean-mappings";
 import { parseFailedFetchResponse } from "@/lib/parse-fetch-error";
+import {
+  appendRun,
+  buildExportFilenameBase,
+  compareRuns,
+  findPreviousRunForDomain,
+  normalizeDomainForHistory,
+  type SinceLastCrawlState
+} from "@/lib/run-history";
+import {
+  notifyRunHistoryUpdated,
+  saveLastAnalyseToSession,
+  takeTransferredResult
+} from "@/lib/last-result-session";
 
 type Preset = {
   name: string;
@@ -27,6 +43,38 @@ export default function HomePage() {
   const [presets, setPresets] = useState<Preset[]>([]);
   const [presetName, setPresetName] = useState("");
   const [crawlProgress, setCrawlProgress] = useState<string | null>(null);
+  const [queueEnabled, setQueueEnabled] = useState(false);
+  const [incrementalPersisted, setIncrementalPersisted] = useState(false);
+  const [sinceLastCrawl, setSinceLastCrawl] = useState<SinceLastCrawlState | null>(
+    null
+  );
+
+  useEffect(() => {
+    const transferred = takeTransferredResult();
+    if (transferred) {
+      setData(transferred);
+      saveLastAnalyseToSession(transferred);
+      setSinceLastCrawl(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/crawl/config")
+      .then((r) => r.json())
+      .then(
+        (j: {
+          queueEnabled?: boolean;
+          incrementalPersisted?: boolean;
+        }) => {
+          setQueueEnabled(Boolean(j.queueEnabled));
+          setIncrementalPersisted(Boolean(j.incrementalPersisted));
+        }
+      )
+      .catch(() => {
+        setQueueEnabled(false);
+        setIncrementalPersisted(false);
+      });
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -52,8 +100,46 @@ export default function HomePage() {
     setIsLoading(true);
     setError(null);
     setData(null);
+    setSinceLastCrawl(null);
     setCrawlProgress(null);
     setLastPayload(payload);
+
+    const commitSuccessfulRun = (result: AnalyseResponseBody) => {
+      setData(result);
+      saveLastAnalyseToSession(result);
+      notifyRunHistoryUpdated();
+      const norm = normalizeDomainForHistory(payload.domain);
+      if (!norm) {
+        setSinceLastCrawl(null);
+        return;
+      }
+      const previous = findPreviousRunForDomain(payload.domain);
+      appendRun({
+        createdAt: Date.now(),
+        domain: norm,
+        crawledPageCount: result.crawledPageCount,
+        totalKeywordMappingsAnalysed: result.totalKeywordMappingsAnalysed,
+        totalOpportunitiesFound: result.totalOpportunitiesFound,
+        settings: {
+          maxPages: payload.maxPages,
+          sitemapOnly: payload.sitemapOnly,
+          incremental: payload.incremental,
+          sitemapUrl: payload.sitemapUrl
+        },
+        result
+      });
+      if (!previous) {
+        setSinceLastCrawl(null);
+        return;
+      }
+      const diff = compareRuns(previous.result, result);
+      setSinceLastCrawl({
+        previousRunAt: previous.createdAt,
+        domain: norm,
+        ...diff
+      });
+    };
+
     try {
       const cleanedMappings = cleanKeywordMappings(payload.keywordMappings);
       if (cleanedMappings.length === 0) {
@@ -66,6 +152,53 @@ export default function HomePage() {
         Math.max(payload.maxPages ?? 50, 1),
         500
       );
+
+      const useRedisWorker =
+        Boolean(payload.useWorkerQueue) && queueEnabled;
+
+      if (useRedisWorker) {
+        setCrawlProgress("Submitting to crawl queue…");
+        const enqueue = await fetch("/api/crawl/jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...payload,
+            keywordMappings: cleanedMappings
+          })
+        });
+        if (!enqueue.ok) {
+          throw new Error(await parseFailedFetchResponse(enqueue));
+        }
+        const { jobId } = (await enqueue.json()) as { jobId: string };
+        setCrawlProgress("Queued — waiting for worker…");
+
+        const maxPolls = 7200;
+        for (let i = 0; i < maxPolls; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const jr = await fetch(`/api/crawl/jobs/${jobId}`);
+          if (!jr.ok) {
+            throw new Error(await parseFailedFetchResponse(jr));
+          }
+          const job = (await jr.json()) as {
+            status: string;
+            progress?: string;
+            result?: AnalyseResponseBody;
+            error?: string;
+          };
+          setCrawlProgress(job.progress ?? "Running…");
+          if (job.status === "complete" && job.result) {
+            commitSuccessfulRun(job.result);
+            return;
+          }
+          if (job.status === "failed") {
+            throw new Error(job.error || "Background crawl failed");
+          }
+        }
+        throw new Error(
+          "Job timed out while polling (worker may have stopped or REDIS_URL mismatch)."
+        );
+      }
+
       /** Above this, use /api/crawl/batch loops so each server call stays short (Vercel Hobby ~10s). */
       const useChunked = maxPages > 15;
 
@@ -110,7 +243,9 @@ export default function HomePage() {
             sitemapOnly: payload.sitemapOnly,
             alreadyCollected: allPages.length,
             batchPageLimit: batchLimit,
-            state
+            state,
+            allowedPathPrefixes: payload.allowedPathPrefixes,
+            incremental: Boolean(payload.incremental)
           })
         });
         if (!res.ok) {
@@ -137,7 +272,7 @@ export default function HomePage() {
         keywordMappings: cleanedMappings,
         gscByKeyword: payload.gscByKeyword
       });
-      setData(out);
+      commitSuccessfulRun(out);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unexpected error");
     } finally {
@@ -148,19 +283,29 @@ export default function HomePage() {
 
   return (
     <main className="space-y-8">
-      <header className="space-y-3">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
-          Internal Linking Opportunity Finder
-        </h1>
+      <div className="space-y-4">
         <p className="max-w-2xl text-sm text-slate-300">
           Crawl your site, analyse on-page content and discover{" "}
           <span className="font-semibold text-emerald-300">
             missed internal linking opportunities
           </span>{" "}
-          based on your target keyword-to-URL mappings.
+          based on your target keyword-to-URL mappings.{" "}
+          <Link
+            href="/how-it-works"
+            className="text-blue-400 hover:text-blue-300 hover:underline"
+          >
+            How it works
+          </Link>
+          .
         </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-slate-300">
+        <WorkspaceJumpNav />
+      </div>
+
+      <section id="analyze" className="scroll-mt-28 space-y-4">
+        <h2 className="text-lg font-semibold text-slate-100">Analyze</h2>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-slate-300">
           <span className="font-semibold text-slate-100">Presets</span>
+          <span className="text-slate-500">(saved in this browser)</span>
           <select
             value=""
             onChange={(e) => {
@@ -202,22 +347,58 @@ export default function HomePage() {
             Save current as preset
           </button>
         </div>
-      </header>
 
-      <CrawlForm
-        onAnalyse={handleAnalyse}
-        isLoading={isLoading}
-        crawlProgress={crawlProgress}
-      />
+        <CrawlForm
+          onAnalyse={handleAnalyse}
+          isLoading={isLoading}
+          crawlProgress={crawlProgress}
+          queueEnabled={queueEnabled}
+          incrementalPersisted={incrementalPersisted}
+        />
+      </section>
 
-      {error && (
-        <div className="rounded-lg border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-100">
-          {error}
-        </div>
-      )}
+      <section id="results" className="scroll-mt-28 space-y-4">
+        <h2 className="text-lg font-semibold text-slate-100">Results</h2>
 
-      <ResultsTable data={data} />
+        {error && (
+          <div className="rounded-lg border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-100">
+            {error}
+          </div>
+        )}
+
+        <ResultsTable
+          data={data}
+          exportFilenameBase={
+            lastPayload?.domain
+              ? buildExportFilenameBase(lastPayload.domain)
+              : "ilo-export"
+          }
+        />
+
+        <RunDiffPanel
+          title="Changes since last crawl"
+          subtitle={
+            sinceLastCrawl
+              ? `Compared to the previous saved run for this domain (${new Date(
+                  sinceLastCrawl.previousRunAt
+                ).toLocaleString()}).`
+              : undefined
+          }
+          domain={sinceLastCrawl?.domain}
+          diff={
+            sinceLastCrawl
+              ? {
+                  newCount: sinceLastCrawl.newCount,
+                  removedCount: sinceLastCrawl.removedCount,
+                  statusChangeCount: sinceLastCrawl.statusChangeCount,
+                  newRows: sinceLastCrawl.newRows,
+                  removedRows: sinceLastCrawl.removedRows,
+                  statusChanges: sinceLastCrawl.statusChanges
+                }
+              : null
+          }
+        />
+      </section>
     </main>
   );
 }
-

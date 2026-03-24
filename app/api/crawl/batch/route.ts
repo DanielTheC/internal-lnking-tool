@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { CrawlBatchRequestBody, CrawlBatchResponseBody } from "@/types";
 import { runCrawlBatch } from "@/lib/crawler";
+import {
+  buildCrawlStartUrls,
+  normalizePathPrefixesList
+} from "@/lib/path-prefixes";
 import { parseSitemapUrls } from "@/lib/sitemap";
 import { normaliseUrl } from "@/lib/url";
+import {
+  loadUrlCache,
+  saveUrlCache,
+  isIncrementalPersistenceAvailable
+} from "@/lib/crawl-incremental-cache";
 
 export const maxDuration = 300;
 
@@ -17,8 +26,12 @@ export async function POST(req: NextRequest) {
       sitemapOnly,
       alreadyCollected = 0,
       batchPageLimit: rawBatch,
-      state
+      state,
+      allowedPathPrefixes: rawPrefixes,
+      incremental: rawIncremental
     } = body;
+
+    const incremental = Boolean(rawIncremental);
 
     if (!domain) {
       return NextResponse.json({ error: "Domain is required." }, { status: 400 });
@@ -37,15 +50,34 @@ export async function POST(req: NextRequest) {
 
     const onVercel = process.env.VERCEL === "1";
 
+    const allowedPathPrefixes = normalizePathPrefixesList(rawPrefixes ?? []);
+
     let initialQueue: string[] = [];
     if (!state) {
+      let sitemapUrls: string[] = [];
       if (sitemapUrl) {
-        initialQueue = await parseSitemapUrls(sitemapUrl, normalisedDomain);
+        sitemapUrls = await parseSitemapUrls(sitemapUrl, normalisedDomain);
       }
+      initialQueue = buildCrawlStartUrls(
+        normalisedDomain,
+        sitemapUrls,
+        allowedPathPrefixes
+      );
       if (initialQueue.length === 0) {
-        initialQueue = [normalisedDomain];
+        return NextResponse.json(
+          {
+            error:
+              "No crawl start URLs match your path-prefix filters. Add a sitemap, widen the paths, or check the domain."
+          },
+          { status: 400 }
+        );
       }
     }
+
+    const initialResourceCache =
+      incremental && isIncrementalPersistenceAvailable()
+        ? await loadUrlCache(normalisedDomain)
+        : undefined;
 
     const result = await runCrawlBatch({
       domainBaseUrl: normalisedDomain,
@@ -57,12 +89,25 @@ export async function POST(req: NextRequest) {
       maxPagesTotal: limitedMaxPages,
       alreadyCollected,
       maxNewPagesThisCall: batchPageLimit,
-      state
+      state,
+      allowedPathPrefixes:
+        allowedPathPrefixes.length > 0 ? allowedPathPrefixes : undefined,
+      incremental,
+      initialResourceCache
     });
+
+    if (incremental && isIncrementalPersistenceAvailable()) {
+      await saveUrlCache(normalisedDomain, result.state.resourceCache ?? {});
+    }
+
+    const stripCache =
+      incremental && isIncrementalPersistenceAvailable();
+    const { resourceCache: _drop, ...stateWithoutCache } = result.state;
+    const responseState = stripCache ? stateWithoutCache : result.state;
 
     const response: CrawlBatchResponseBody = {
       newPages: result.newPages,
-      state: result.state,
+      state: responseState,
       complete: result.complete
     };
 

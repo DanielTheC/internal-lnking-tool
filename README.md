@@ -2,6 +2,8 @@
 
 Next.js app that crawls a site, extracts on-page content, and scores internal linking opportunities from your keyword → destination URL mappings.
 
+- **UI**: `/` is the **Analyze** workspace (jump links: Analyze, Results). **`/how-it-works`** explains each feature in plain language.
+
 ## Chunked crawling (Vercel / serverless)
 
 Serverless functions have **short wall-clock limits**. Crawling many pages in one request can time out.
@@ -31,6 +33,31 @@ For **≤15 pages**, the UI uses a single **`POST /api/analyse`** (full crawl + 
 | Types | `types/index.ts` (`SerializableCrawlState`, batch request/response) |
 | UI: pages per request | `components/CrawlForm.tsx` |
 
+## Incremental crawls (ETag / Last-Modified)
+
+When **Incremental crawl** is enabled in the form (or `incremental: true` in the API body), the crawler:
+
+1. Stores **validators** (`ETag`, `Last-Modified`) and a **snapshot of `PageData`** per normalised URL after a successful HTML fetch.
+2. On later runs, sends **conditional GET** headers (`If-None-Match` / `If-Modified-Since`) when validators exist.
+3. On **`304 Not Modified`**, reuses the cached `PageData` (no HTML body) and still **discovers outgoing internal links** from the snapshot so the frontier stays consistent.
+
+**Persistence**
+
+| Environment | Behaviour |
+|-------------|-----------|
+| **`REDIS_URL` set** | Cache is stored in Redis (`ilo:crawl:incr:<origin>`), 30-day TTL. Recommended for **chunked** `/api/crawl/batch` and production. |
+| **Local dev** (no Redis) | Writes under **`.cache/crawl-incremental/`** (gitignored). |
+| **Production without Redis** | Cross-run persistence is **off**; incremental only helps within a single long request. Set `CRAWL_INCREMENTAL_FILE=1` to force file writes in production (ensure a writable path). |
+
+`GET /api/crawl/config` includes **`incrementalPersisted`** so the UI can warn when persistence is unavailable.
+
+## Run history & exports (browser)
+
+- **Export CSV / Export JSON** on the results table download the **current** view (CSV respects filters; JSON is the full `AnalyseResponseBody`, including `graph` when present).
+- **Run history** (`/run-history`) and **Topical map** (`/topical-map`) are linked in the app header. History uses browser **localStorage**; the topical map reads the graph from your **most recent successful analysis** in this session (see `lib/last-result-session.ts`).
+
+Use exports for backups or sharing.
+
 ## Local development
 
 ```bash
@@ -42,6 +69,87 @@ npm run dev
 npm run build
 ```
 
+## Redis crawl queue + worker (large sites)
+
+The in-browser loop calls `/api/crawl/batch` up to **400** times. For very large crawls, use a **background worker** instead: one long Node process runs `crawlSite` to completion (no batch cap).
+
+### 1. Redis
+
+Set **`REDIS_URL`** on the machine running **Next.js** (e.g. `redis://127.0.0.1:6379`).
+
+Local Redis:
+
+```bash
+docker compose up -d
+```
+
+### 2. Worker process
+
+In a **second terminal** (same repo, same `REDIS_URL`):
+
+```bash
+set REDIS_URL=redis://127.0.0.1:6379
+npm run crawl-worker
+```
+
+### 3. App UI
+
+When `REDIS_URL` is set, the app exposes **`GET /api/crawl/config`** → `{ "queueEnabled": true }` and the form shows **“Redis background worker”**. Enable it and run an analysis: the browser **enqueues a job** and **polls** `GET /api/crawl/jobs/:id` until `complete` or `failed`.
+
+### API
+
+| Method | Path | Purpose |
+|--------|------|--------|
+| `GET` | `/api/crawl/config` | `queueEnabled`, `incrementalPersisted` |
+| `POST` | `/api/crawl/jobs` | Enqueue a crawl (same JSON body as analyse, minus UI-only fields) |
+| `GET` | `/api/crawl/jobs/:id` | Job status, progress, `result` when done |
+
+### Deployment notes
+
+- **Vercel** — Keep using **chunked browser crawls** or **single `/api/analyse`**; the worker is **not** meant to run on Vercel serverless. Run the worker on a **VM, Docker host, Railway, Render worker**, etc., with the same `REDIS_URL` as your API if the API enqueues jobs.
+- **Job durability** — If the worker dies mid-job, that job is lost (no re-queue in v1). Restart the worker and submit again.
+- **Result size** — Large `result` JSON is stored in Redis (fine for typical sites; huge results may need a different store later).
+
 ## Environment
 
 - **`VERCEL`** — Set automatically on Vercel; affects crawl politeness and timeouts.
+- **`REDIS_URL`** — Enables the crawl queue + worker (optional).
+
+## robots.txt
+
+The crawler loads `https://<your-domain>/robots.txt` once per crawl (cached in chunked crawl state so later batches don’t re-fetch it).
+
+- **Disallow / Allow** — URLs that are disallowed for your crawl User-Agent are **not queued** and **not fetched.
+- **Crawl-delay** — If present for your User-Agent, the delay between requests is **at least** `max(crawl-delay seconds, your existing politeness delay)` (e.g. Vercel still uses 0 ms base delay unless the site sets Crawl-delay).
+- **404 / unreachable robots.txt** — Treated as **no rules** (everything allowed), which matches common crawler behaviour.
+
+## Paragraph context (scoring)
+
+Keyword matches are analysed **per `<p>` block** (fallback: whole main text if there are no `<p>` tags). Each block gets a **context quality** score (0–1) based on:
+
+- Multiple sentences, reasonable length → higher (editorial body copy).
+- Short blurbs, cookie/newsletter/privacy boilerplate → lower.
+
+That score **adds up to +3** to the opportunity score and appears as the **Context** column. Snippets prefer the **highest-quality paragraph** that contains the keyword.
+
+## Path prefixes (crawl only certain folders)
+
+In the form, **Path prefixes** lets you list URL paths such as `/blog`, `/sale/mens`. Only pages whose path **starts with** one of these prefixes are **queued and fetched**. Link discovery follows the same rules.
+
+- **Empty** = crawl the whole site (default).
+- **`/`** = explicitly allow the entire site (useful with sitemaps).
+- With a **sitemap**, URLs are filtered to these prefixes. If nothing matches, the crawl seeds from `https://your-domain` + each prefix (e.g. `/blog` → `https://example.com/blog`).
+
+## Why some sites won’t crawl (e.g. Cloudflare)
+
+Many shops use **Cloudflare** (or similar). They often:
+
+- **Block or challenge** requests from **datacenter IPs** (including **Vercel** / AWS Lambda).
+- Show a **“Just a moment…”** / JavaScript check — this app **does not execute JavaScript**, so that page cannot be “passed” like a real browser.
+
+**What to try**
+
+1. Run **`npm run dev` on your own PC** — your home/office IP is often allowed.
+2. Turn on **“Use sitemap URLs only”** and keep the crawl limit small (only URLs listed in the sitemap are fetched).
+3. Try another **User-Agent** preset (rarely fixes Cloudflare, but sometimes helps).
+4. For production on Vercel, there is **no guaranteed fix** without a **proxy with residential IPs** or the site **allowlisting** your crawler — that’s a limitation of serverless crawling, not this repo only.

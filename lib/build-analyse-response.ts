@@ -7,6 +7,7 @@ import type {
 import { analysePagesForOpportunities } from "@/lib/analyser";
 import { applyGscToResults } from "@/lib/gsc-merge";
 import { sanitizeGscByKeyword } from "@/lib/gsc-sanitize";
+import { buildAnalyseGraphPayload } from "@/lib/build-analyse-graph";
 
 export function buildAnalyseResponse(args: {
   pages: PageData[];
@@ -28,6 +29,7 @@ export function buildAnalyseResponse(args: {
       (r) =>
         r.status === "Opportunity found" || r.status === "Weak anchor"
     ).length,
-    results
+    results,
+    graph: buildAnalyseGraphPayload(pages, results)
   };
 }
