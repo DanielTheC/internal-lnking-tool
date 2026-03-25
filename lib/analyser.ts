@@ -279,18 +279,17 @@ export function analysePagesForOpportunities(
         mapping.matchMode
       );
 
+      const contentBlocks = page.contentBlocks ?? [];
       const blocksForContext =
-        page.contentBlocks && page.contentBlocks.length > 0
-          ? page.contentBlocks
-          : [searchText];
+        contentBlocks.length > 0 ? contentBlocks : [searchText];
 
       const singleFullPageFallback =
-        page.contentBlocks.length === 1 &&
+        contentBlocks.length === 1 &&
         page.bodyText.length > 0 &&
-        page.contentBlocks[0].length >= page.bodyText.length * 0.92;
+        contentBlocks[0].length >= page.bodyText.length * 0.92;
 
       const useEditorialParagraphGate =
-        page.contentBlocks.length > 0 && !singleFullPageFallback;
+        contentBlocks.length > 0 && !singleFullPageFallback;
 
       const keywordContextAny =
         positions.length > 0

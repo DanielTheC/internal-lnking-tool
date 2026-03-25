@@ -1,4 +1,6 @@
 import * as cheerio from "cheerio";
+import type { Cheerio } from "cheerio";
+import type { AnyNode } from "domhandler";
 import type { PageData, RobotsDirectives } from "@/types";
 import {
   getLinkResolutionBase,
@@ -35,9 +37,7 @@ function cleanText(text: string): string {
  * Remove faceted search / PLP filter regions that often live inside &lt;main&gt; (not in &lt;nav&gt;).
  * Keyword hits there are not editorial internal-linking context.
  */
-function stripFacetedFilterRegions(
-  root: cheerio.Cheerio<cheerio.Element>
-): void {
+function stripFacetedFilterRegions(root: Cheerio<AnyNode>): void {
   const selectors = [
     "[data-facet]",
     "[data-facets]",
