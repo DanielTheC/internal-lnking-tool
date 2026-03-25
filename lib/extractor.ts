@@ -31,6 +31,43 @@ function cleanText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Remove faceted search / PLP filter regions that often live inside &lt;main&gt; (not in &lt;nav&gt;).
+ * Keyword hits there are not editorial internal-linking context.
+ */
+function stripFacetedFilterRegions(
+  root: cheerio.Cheerio<cheerio.Element>
+): void {
+  const selectors = [
+    "[data-facet]",
+    "[data-facets]",
+    "[data-faceted]",
+    "[data-facet-filters]",
+    "[data-filter]",
+    "[data-filter-group]",
+    '[aria-label*="filter"]',
+    '[aria-label*="Filter"]',
+    '[aria-label*="refine"]',
+    '[aria-label*="Refine"]',
+    '[id*="facet"]',
+    '[id*="Facet"]',
+    '[id*="facets"]',
+    '[id*="Facets"]',
+    '[class*="facet-filter"]',
+    '[class*="FacetFilters"]',
+    '[class*="facets__"]',
+    '[class*="collection-filters"]',
+    '[class*="product-filters"]',
+    '[class*="plp-filters"]',
+    '[class*="searchspring-facet"]',
+    ".refinements",
+    ".active-facets",
+    "#FacetFiltersForm",
+    'form[action*="facet"]'
+  ].join(", ");
+  root.find(selectors).remove();
+}
+
 export function extractPageData(
   url: string,
   html: string,
@@ -52,6 +89,7 @@ export function extractPageData(
 
   main.find("header, footer, nav, aside").remove();
   main.find("script, style, noscript").remove();
+  stripFacetedFilterRegions(main);
 
   const bodyText = cleanText(main.text());
 

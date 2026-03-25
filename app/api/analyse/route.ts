@@ -3,6 +3,7 @@ import type { AnalyseRequestBody } from "@/types";
 import { cleanKeywordMappings } from "@/lib/clean-mappings";
 import { normaliseUrl } from "@/lib/url";
 import { runFullAnalyse } from "@/lib/run-full-analyse";
+import { appendServerRunFromResult } from "@/lib/crawl-server-runs-store";
 
 /**
  * Serverless max run time (seconds). Vercel Hobby caps at ~10s regardless.
@@ -46,6 +47,19 @@ export async function POST(req: NextRequest) {
       domain,
       keywordMappings,
       cleanedMappings
+    });
+
+    void appendServerRunFromResult({
+      domain,
+      settings: {
+        maxPages: body.maxPages,
+        sitemapOnly: body.sitemapOnly,
+        incremental: body.incremental,
+        sitemapUrl: body.sitemapUrl
+      },
+      result: response
+    }).catch(() => {
+      // non-fatal
     });
 
     return NextResponse.json(response);

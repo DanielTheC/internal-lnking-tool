@@ -12,6 +12,9 @@ out/
 # Local incremental crawl cache (ETag / Last-Modified snapshots)
 .cache/
 
+# Encrypted GSC OAuth tokens (when not using Redis)
+.data/
+
 # Debug / OS
 npm-debug.log*
 .DS_Store

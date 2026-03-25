@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { AnalyseRequestBody, KeywordMapping } from "@/types";
 import KeywordMappingInput from "@/components/KeywordMappingInput";
-import { parseGscCsvToKeywordMap } from "@/lib/gsc-csv";
+import GscSearchConsoleSection from "@/components/GscSearchConsoleSection";
 import {
   USER_AGENT_PRESETS,
   USER_AGENT_PRESET_CUSTOM,
@@ -277,69 +277,15 @@ export default function CrawlForm({
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-100">
-              Search Console (optional)
-            </h2>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Export <strong>Performance → Queries</strong> as CSV from GSC
-              and upload. Rows are matched to your <strong>keyword</strong>{" "}
-              (case-insensitive) to boost sorting scores.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="cursor-pointer rounded-md border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-100 hover:border-slate-500">
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!file) return;
-                  setGscParseError(null);
-                  try {
-                    const text = await file.text();
-                    const map = parseGscCsvToKeywordMap(text);
-                    setGscByKeyword(map);
-                    setGscFileLabel(
-                      `${file.name} · ${Object.keys(map).length} queries`
-                    );
-                  } catch (err) {
-                    setGscByKeyword({});
-                    setGscFileLabel(null);
-                    setGscParseError(
-                      err instanceof Error ? err.message : "Invalid CSV"
-                    );
-                  }
-                }}
-              />
-              Choose CSV
-            </label>
-            {gscFileLabel && (
-              <button
-                type="button"
-                onClick={() => {
-                  setGscByKeyword({});
-                  setGscFileLabel(null);
-                  setGscParseError(null);
-                }}
-                className="text-xs text-slate-400 hover:text-red-400"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-        {gscFileLabel && (
-          <p className="mt-2 text-xs text-emerald-400">{gscFileLabel}</p>
-        )}
-        {gscParseError && (
-          <p className="mt-2 text-xs text-red-400">{gscParseError}</p>
-        )}
-      </div>
+      <GscSearchConsoleSection
+        domain={domain}
+        gscByKeyword={gscByKeyword}
+        setGscByKeyword={setGscByKeyword}
+        gscFileLabel={gscFileLabel}
+        setGscFileLabel={setGscFileLabel}
+        gscParseError={gscParseError}
+        setGscParseError={setGscParseError}
+      />
 
       <KeywordMappingInput
         mappings={keywordMappings}

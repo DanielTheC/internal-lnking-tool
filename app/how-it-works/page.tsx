@@ -140,9 +140,10 @@ export default function HowItWorksPage() {
         <p className="text-sm text-slate-300">
           Rows get a numeric <strong>score</strong> derived from match
           strength, anchor context, and (when enabled) paragraph-level context
-          quality. If you import a <strong>Google Search Console</strong> CSV,
-          queries matching keywords can boost scores using impressions/clicks
-          (see UI for which columns are used).
+          quality. If you import <strong>Search Console Performance → Queries</strong>{" "}
+          (CSV) or pull the same data via the <strong>Search Console API</strong>{" "}
+          (when the server is configured), queries matching keywords can boost
+          scores using impressions/clicks.
         </p>
       </section>
 

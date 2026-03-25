@@ -27,6 +27,24 @@ export function scoreParagraphContext(paragraph: string): number {
   if (t.length < 20) return 0.15;
 
   const lower = t.toLowerCase();
+  const words = t.split(/\s+/).filter(Boolean);
+  const wordCount = words.length;
+
+  // E‑commerce PLP / facet UI blobs (e.g. "Refine by Product Type: Court Shoes…")
+  if (/\brefine\s+by\b/i.test(lower)) return 0.06;
+  if (/\bfilter\s+by\b/i.test(lower)) return 0.06;
+  const refineRepeats = (lower.match(/\brefine\s+by\b/g) || []).length;
+  if (refineRepeats >= 2) return 0.05;
+  const productTypeRepeats = (lower.match(/\bproduct\s+type\s*:/g) || []).length;
+  if (productTypeRepeats >= 2) return 0.06;
+  if (
+    productTypeRepeats >= 1 &&
+    wordCount > 35 &&
+    /\b(shoes?|bag|sandals?|boots?|trainers?|heels?)\b/i.test(lower)
+  ) {
+    const roughSent = t.split(/[.!?]+\s+/).filter((s) => s.trim().length > 15);
+    if (roughSent.length <= 1) return 0.08;
+  }
 
   const boilerplatePatterns = [
     /cookie(s)?\s+policy/,
@@ -45,8 +63,6 @@ export function scoreParagraphContext(paragraph: string): number {
   ];
   if (boilerplatePatterns.some((r) => r.test(lower))) return 0.2;
 
-  const words = t.split(/\s+/).filter(Boolean);
-  const wordCount = words.length;
   if (wordCount < 6) return 0.25;
 
   // Multiple sentences → more likely real copy
@@ -74,6 +90,27 @@ export type KeywordBlockContext = {
   /** Max quality among all matching paragraphs (for scoring). */
   bestMatchContextQuality: number;
 };
+
+/** Paragraphs at or above this score count as “editorial” for keyword opportunities. */
+export const MIN_EDITORIAL_PARAGRAPH_SCORE = 0.42;
+
+/**
+ * Like {@link getKeywordContextFromBlocks}, but only considers paragraphs that look like
+ * body copy — not facet filters, nav-like blobs, etc.
+ */
+export function getEditorialKeywordContext(
+  blocks: string[],
+  keyword: string,
+  matchMode: KeywordMapping["matchMode"]
+): KeywordBlockContext | null {
+  const editorial = blocks.filter(
+    (b) =>
+      b.trim().length > 0 &&
+      scoreParagraphContext(b) >= MIN_EDITORIAL_PARAGRAPH_SCORE
+  );
+  if (editorial.length === 0) return null;
+  return getKeywordContextFromBlocks(editorial, keyword, matchMode);
+}
 
 function buildSnippetLocal(text: string, index: number, radius = 100): string {
   const start = Math.max(0, index - radius);

@@ -6,6 +6,7 @@
  */
 
 import { runFullAnalyse } from "@/lib/run-full-analyse";
+import { appendServerRunFromResult } from "@/lib/crawl-server-runs-store";
 import {
   blockingPopJobId,
   crawlJobRedisKey,
@@ -67,6 +68,18 @@ async function processJob(jobId: string): Promise<void> {
       status: "complete",
       progress: "Complete",
       result
+    });
+    void appendServerRunFromResult({
+      domain: payload.domain,
+      settings: {
+        maxPages: payload.maxPages,
+        sitemapOnly: payload.sitemapOnly,
+        incremental: payload.incremental,
+        sitemapUrl: payload.sitemapUrl
+      },
+      result
+    }).catch(() => {
+      /* non-fatal */
     });
     console.info("Job complete", jobId, result.crawledPageCount, "pages");
   } catch (e) {

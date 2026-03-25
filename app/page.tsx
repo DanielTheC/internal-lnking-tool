@@ -45,6 +45,7 @@ export default function HomePage() {
   const [crawlProgress, setCrawlProgress] = useState<string | null>(null);
   const [queueEnabled, setQueueEnabled] = useState(false);
   const [incrementalPersisted, setIncrementalPersisted] = useState(false);
+  const [serverCrawlSaveEnabled, setServerCrawlSaveEnabled] = useState(false);
   const [sinceLastCrawl, setSinceLastCrawl] = useState<SinceLastCrawlState | null>(
     null
   );
@@ -65,14 +66,17 @@ export default function HomePage() {
         (j: {
           queueEnabled?: boolean;
           incrementalPersisted?: boolean;
+          serverCrawlSaveEnabled?: boolean;
         }) => {
           setQueueEnabled(Boolean(j.queueEnabled));
           setIncrementalPersisted(Boolean(j.incrementalPersisted));
+          setServerCrawlSaveEnabled(Boolean(j.serverCrawlSaveEnabled));
         }
       )
       .catch(() => {
         setQueueEnabled(false);
         setIncrementalPersisted(false);
+        setServerCrawlSaveEnabled(false);
       });
   }, []);
 
@@ -104,10 +108,40 @@ export default function HomePage() {
     setCrawlProgress(null);
     setLastPayload(payload);
 
-    const commitSuccessfulRun = (result: AnalyseResponseBody) => {
+    const commitSuccessfulRun = (
+      result: AnalyseResponseBody,
+      opts?: { crawlServerSave?: "client" | "skip" }
+    ) => {
       setData(result);
       saveLastAnalyseToSession(result);
       notifyRunHistoryUpdated();
+
+      if (
+        opts?.crawlServerSave === "client" &&
+        serverCrawlSaveEnabled
+      ) {
+        void (async () => {
+          try {
+            await fetch("/api/crawl/server-runs", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                domain: payload.domain,
+                result,
+                settings: {
+                  maxPages: payload.maxPages,
+                  sitemapOnly: payload.sitemapOnly,
+                  incremental: payload.incremental,
+                  sitemapUrl: payload.sitemapUrl
+                }
+              })
+            });
+          } catch {
+            // non-fatal
+          }
+        })();
+      }
+
       const norm = normalizeDomainForHistory(payload.domain);
       if (!norm) {
         setSinceLastCrawl(null);
@@ -187,7 +221,7 @@ export default function HomePage() {
           };
           setCrawlProgress(job.progress ?? "Running…");
           if (job.status === "complete" && job.result) {
-            commitSuccessfulRun(job.result);
+            commitSuccessfulRun(job.result, { crawlServerSave: "skip" });
             return;
           }
           if (job.status === "failed") {
@@ -215,7 +249,7 @@ export default function HomePage() {
           throw new Error(await parseFailedFetchResponse(res));
         }
         const json = (await res.json()) as AnalyseResponseBody;
-        setData(json);
+        commitSuccessfulRun(json, { crawlServerSave: "skip" });
         return;
       }
 
@@ -272,7 +306,7 @@ export default function HomePage() {
         keywordMappings: cleanedMappings,
         gscByKeyword: payload.gscByKeyword
       });
-      commitSuccessfulRun(out);
+      commitSuccessfulRun(out, { crawlServerSave: "client" });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unexpected error");
     } finally {

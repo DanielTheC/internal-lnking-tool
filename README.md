@@ -58,6 +58,57 @@ When **Incremental crawl** is enabled in the form (or `incremental: true` in the
 
 Use exports for backups or sharing.
 
+## Server-side crawl archive (optional)
+
+Set **`CRAWL_SERVER_SAVE_ENABLED=1`** (or `true`) so each successful crawl is stored on the server as a full **`SavedRunRecord`** (same shape as browser run history: domain, settings, full `AnalyseResponseBody`, etc.). Up to **40** runs are kept; older runs are dropped when the JSON blob exceeds the same size guard as browser history.
+
+| Storage | Location |
+|---------|----------|
+| **`REDIS_URL` set** | Redis key `ilo:crawl-server-runs:blob:v1` (recommended on Vercel / multi-instance). |
+| **No Redis** | File **`.data/crawl-server-runs.json`** (local dev; ensure the directory is writable). |
+
+**Where saving happens**
+
+- **`POST /api/analyse`** (≤15 pages, single request): saved in the route handler after analysis.
+- **Chunked crawl** (browser loops `/api/crawl/batch` then analyses locally): the browser **`POST`s** `/api/crawl/server-runs` after a successful run.
+- **Redis queue worker** (`npm run crawl-worker`): saved when the job completes.
+
+`GET /api/crawl/config` exposes **`serverCrawlSaveEnabled`**. List runs without full JSON: **`GET /api/crawl/server-runs`**. Full run: **`GET /api/crawl/server-runs/:id`**. Remove: **`DELETE /api/crawl/server-runs/:id`**.
+
+There is **no authentication** on these APIs by default—only enable this on trusted networks or add your own protection (VPN, middleware, secret header) before exposing the app publicly.
+
+## Search Console API (optional automatic query import)
+
+Instead of uploading the **Performance → Queries** CSV, you can connect one or more **Google accounts** (e.g. two agency accounts) and pull the same metrics with the **Search Analytics API**.
+
+### Google Cloud setup
+
+1. Create a project in [Google Cloud Console](https://console.cloud.google.com/).
+2. Enable **Google Search Console API**.
+3. **Credentials → Create credentials → OAuth client ID → Web application**.
+4. Add **Authorized redirect URIs** exactly matching your app, e.g.  
+   `http://localhost:3000/api/gsc/auth/callback` (dev) and  
+   `https://your-domain.com/api/gsc/auth/callback` (prod).
+
+### Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `GOOGLE_CLIENT_ID` | OAuth 2.0 Client ID |
+| `GOOGLE_CLIENT_SECRET` | OAuth 2.0 Client Secret |
+| `GSC_OAUTH_REDIRECT_URI` | Must match one authorized redirect URI **exactly** (e.g. `http://localhost:3000/api/gsc/auth/callback`) |
+| `GSC_ENCRYPTION_SECRET` | Long random string used to encrypt refresh tokens at rest (scrypt-derived AES-256-GCM key) |
+| `NEXT_PUBLIC_APP_URL` | Optional; public origin for redirects after OAuth (e.g. `https://your-domain.com`). If unset, the request URL origin is used. |
+
+### Token storage
+
+- **`REDIS_URL` set** (recommended for Vercel / multiple instances): encrypted connection blob in Redis (`ilo:gsc:connections:blob:v1`).
+- **Local / no Redis**: encrypted file under **`.data/gsc-connections.enc`** (gitignored).
+
+Each **Connect Google** run adds a connection (refresh token). In the UI, pick **which Google account** and **which Search Console property** for each client; **Account display label** + **Save label** rename a connection without reconnecting. **Saved client presets** (browser `localStorage`) remember `connection + property` pairs for quick switching.
+
+Copy **`.env.example`** to **`.env.local`** and fill in the GSC variables when using the API.
+
 ## Local development
 
 ```bash

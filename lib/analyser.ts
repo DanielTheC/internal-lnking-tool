@@ -5,7 +5,10 @@ import type {
   PageData
 } from "@/types";
 import { normaliseUrl, urlsEqual } from "./url";
-import { getKeywordContextFromBlocks } from "./paragraph-context";
+import {
+  getEditorialKeywordContext,
+  getKeywordContextFromBlocks
+} from "./paragraph-context";
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -281,7 +284,15 @@ export function analysePagesForOpportunities(
           ? page.contentBlocks
           : [searchText];
 
-      const keywordContext =
+      const singleFullPageFallback =
+        page.contentBlocks.length === 1 &&
+        page.bodyText.length > 0 &&
+        page.contentBlocks[0].length >= page.bodyText.length * 0.92;
+
+      const useEditorialParagraphGate =
+        page.contentBlocks.length > 0 && !singleFullPageFallback;
+
+      const keywordContextAny =
         positions.length > 0
           ? getKeywordContextFromBlocks(
               blocksForContext,
@@ -289,7 +300,17 @@ export function analysePagesForOpportunities(
               mapping.matchMode
             )
           : null;
-      const paragraphQ = keywordContext?.bestMatchContextQuality;
+
+      const editorialContext =
+        positions.length > 0 && useEditorialParagraphGate
+          ? getEditorialKeywordContext(
+              blocksForContext,
+              mapping.keyword,
+              mapping.matchMode
+            )
+          : keywordContextAny;
+
+      const paragraphQ = keywordContextAny?.bestMatchContextQuality;
 
       const linkFlags = anchorsWithKeyword(
         page,
@@ -311,7 +332,8 @@ export function analysePagesForOpportunities(
           getAnchorTextsToDestination(page, destination)[0] ?? null;
         const bodySnippet =
           anchorTier === "weak" && positions.length > 0
-            ? keywordContext?.snippet ?? buildSnippet(searchText, positions[0])
+            ? keywordContextAny?.snippet ??
+              buildSnippet(searchText, positions[0])
             : anchorPreview;
         results.push({
           keyword: mapping.keyword,
@@ -349,10 +371,25 @@ export function analysePagesForOpportunities(
         continue;
       }
 
+      if (useEditorialParagraphGate && !editorialContext) {
+        results.push({
+          keyword: mapping.keyword,
+          group: mapping.group,
+          sourceUrl,
+          sourceTitle: page.title || page.metaTitle || page.h1,
+          destinationUrl: destination,
+          snippet: null,
+          status: "Keyword not found",
+          score: 1,
+          cannibalisationRisk: Boolean(keywordHasMultipleDests || groupHasMultipleDests)
+        });
+        continue;
+      }
+
       if (linkFlags.toOther) {
         const status: OpportunityStatus = "Linked to different URL";
         const snippet =
-          keywordContext?.snippet ?? buildSnippet(searchText, positions[0]);
+          editorialContext?.snippet ?? buildSnippet(searchText, positions[0]);
         results.push({
           keyword: mapping.keyword,
           group: mapping.group,
@@ -375,7 +412,7 @@ export function analysePagesForOpportunities(
       }
 
       const snippet =
-        keywordContext?.snippet ?? buildSnippet(searchText, positions[0]);
+        editorialContext?.snippet ?? buildSnippet(searchText, positions[0]);
 
       const status: OpportunityStatus = "Opportunity found";
       results.push({
