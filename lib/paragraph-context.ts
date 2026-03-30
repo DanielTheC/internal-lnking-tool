@@ -30,6 +30,28 @@ export function scoreParagraphContext(paragraph: string): number {
   const words = t.split(/\s+/).filter(Boolean);
   const wordCount = words.length;
 
+  // Breadcrumb trails: "Home / Women / Flat Sandals" or "Home > Sale > Shoes"
+  const slashTrailSegments = t.split(/\s*\/\s*/).filter((s) => s.trim().length > 0);
+  if (
+    slashTrailSegments.length >= 2 &&
+    slashTrailSegments.length <= 10 &&
+    t.length <= 220 &&
+    !/[.!?]\s+\w/.test(t)
+  ) {
+    const longestSeg = Math.max(...slashTrailSegments.map((s) => s.length));
+    if (longestSeg <= 45) return 0.07;
+  }
+  const gtTrailSegments = t.split(/\s*>\s*/).filter((s) => s.trim().length > 0);
+  if (
+    gtTrailSegments.length >= 2 &&
+    gtTrailSegments.length <= 10 &&
+    t.length <= 220 &&
+    /^[^>]+\s*(>\s*[^>]+)+$/.test(t.trim())
+  ) {
+    const longestGt = Math.max(...gtTrailSegments.map((s) => s.length));
+    if (longestGt <= 45) return 0.07;
+  }
+
   // E‑commerce PLP / facet UI blobs (e.g. "Refine by Product Type: Court Shoes…")
   if (/\brefine\s+by\b/i.test(lower)) return 0.06;
   if (/\bfilter\s+by\b/i.test(lower)) return 0.06;

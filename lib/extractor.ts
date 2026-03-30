@@ -68,6 +68,32 @@ function stripFacetedFilterRegions(root: Cheerio<AnyNode>): void {
   root.find(selectors).remove();
 }
 
+/**
+ * Breadcrumbs often sit in &lt;main&gt; as a div/ol (not semantic &lt;nav&gt;) — remove before body text / &lt;p&gt; blocks.
+ */
+function stripBreadcrumbRegions(root: Cheerio<AnyNode>): void {
+  const selectors = [
+    "[itemtype*='BreadcrumbList']",
+    "[itemtype*='breadcrumb']",
+    'nav[aria-label*="Breadcrumb"]',
+    'nav[aria-label*="breadcrumb"]',
+    'nav[aria-label*="bread crumb"]',
+    '[role="navigation"][aria-label*="Breadcrumb"]',
+    '[role="navigation"][aria-label*="breadcrumb"]',
+    '[data-testid*="breadcrumb"]',
+    '[data-test*="breadcrumb"]',
+    '[class*="breadcrumb"]',
+    '[class*="Breadcrumb"]',
+    '[id*="breadcrumb"]',
+    '[id*="Breadcrumb"]',
+    ".breadcrumbs",
+    "#breadcrumbs",
+    ".bread-crumb",
+    ".page-breadcrumb"
+  ].join(", ");
+  root.find(selectors).remove();
+}
+
 export function extractPageData(
   url: string,
   html: string,
@@ -89,7 +115,38 @@ export function extractPageData(
 
   main.find("header, footer, nav, aside").remove();
   main.find("script, style, noscript").remove();
+
+  /**
+   * Crawl frontier: every internal href in main (including breadcrumb / facets) so we don’t miss URLs.
+   * Anchor classification uses a second pass *after* stripping non-body UI (below).
+   */
+  const outgoingInternalLinks = new Set<string>();
+  main.find("a[href]").each((_, el) => {
+    const href = $(el).attr("href");
+    if (!href || shouldIgnoreHref(href)) return;
+    const absolute = normaliseUrl(href, linkBase);
+    if (!absolute) return;
+    if (shouldSkipCrawlUrl(absolute)) return;
+    if (!isInternalUrl(absolute, domain)) return;
+    outgoingInternalLinks.add(absolute);
+  });
+
   stripFacetedFilterRegions(main);
+  stripBreadcrumbRegions(main);
+
+  const internalAnchors: { href: string; text: string }[] = [];
+  main.find("a[href]").each((_, el) => {
+    const href = $(el).attr("href");
+    if (!href || shouldIgnoreHref(href)) return;
+    const absolute = normaliseUrl(href, linkBase);
+    if (!absolute) return;
+    if (shouldSkipCrawlUrl(absolute)) return;
+    if (!isInternalUrl(absolute, domain)) return;
+    const text = cleanText($(el).text());
+    if (text) {
+      internalAnchors.push({ href: absolute, text });
+    }
+  });
 
   const bodyText = cleanText(main.text());
 
@@ -110,22 +167,6 @@ export function extractPageData(
     const fallback = cleanText(mainForBlocks.text());
     if (fallback.length > 0) contentBlocks.push(fallback);
   }
-
-  const outgoingInternalLinks = new Set<string>();
-  const internalAnchors: { href: string; text: string }[] = [];
-  main.find("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href || shouldIgnoreHref(href)) return;
-    const absolute = normaliseUrl(href, linkBase);
-    if (!absolute) return;
-    if (shouldSkipCrawlUrl(absolute)) return;
-    if (!isInternalUrl(absolute, domain)) return;
-    outgoingInternalLinks.add(absolute);
-    const text = cleanText($(el).text());
-    if (text) {
-      internalAnchors.push({ href: absolute, text });
-    }
-  });
 
   return {
     url,

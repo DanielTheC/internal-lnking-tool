@@ -43,8 +43,9 @@ function buildSnippet(text: string, index: number, radius = 80): string {
   return snippet;
 }
 
+/** True if an in-body (post-strip) anchor targets `dest`. Breadcrumb / facet-only links do not count. */
 function pageLinksToDestination(page: PageData, dest: string): boolean {
-  return page.outgoingInternalLinks.some((href) => urlsEqual(href, dest));
+  return page.internalAnchors.some((a) => urlsEqual(a.href, dest));
 }
 
 /** Anchor texts on this page that target `dest` (main content only — same as internalAnchors). */
@@ -400,7 +401,7 @@ export function analysePagesForOpportunities(
           score: computeScore({
             matchCount: positions.length,
             path: new URL(sourceUrl).pathname,
-            hasExistingLinks: page.outgoingInternalLinks.length > 0,
+            hasExistingLinks: page.internalAnchors.length > 0,
             status,
             paragraphContextQuality: paragraphQ
           }),
@@ -425,7 +426,7 @@ export function analysePagesForOpportunities(
         score: computeScore({
           matchCount: positions.length,
           path: new URL(sourceUrl).pathname,
-          hasExistingLinks: page.outgoingInternalLinks.length > 0,
+          hasExistingLinks: page.internalAnchors.length > 0,
           status,
           paragraphContextQuality: paragraphQ
         }),

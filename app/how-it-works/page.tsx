@@ -11,6 +11,7 @@ const toc = [
   { id: "overview", label: "Overview" },
   { id: "crawling", label: "Crawling" },
   { id: "mappings", label: "Keyword mappings" },
+  { id: "content", label: "Page content & links" },
   { id: "results", label: "Results & statuses" },
   { id: "scoring", label: "Scoring & GSC" },
   { id: "incremental", label: "Incremental crawl" },
@@ -30,9 +31,11 @@ export default function HowItWorksPage() {
         </h1>
         <p className="max-w-3xl text-sm text-slate-400">
           Plain-language rules for each part of the app. The{" "}
-          <strong>Analyze</strong> page is limited to the crawl form and results
-          table; some features below are documented for reference or JSON exports.
-          For implementation details, see the project README.
+          <strong>Analyze</strong> workspace is the main crawl form and results
+          table. <strong>Run history</strong>, <strong>Topical map</strong>, and
+          this page are linked from the header. Optional features (Search Console
+          API pull, server-side run archive) need environment variables—see the
+          README.
         </p>
         <p className="text-sm">
           <Link href="/" className="text-blue-400 hover:underline">
@@ -118,9 +121,47 @@ export default function HowItWorksPage() {
           Each row is a <strong>keyword</strong> (or phrase), a{" "}
           <strong>destination URL</strong> you want to promote, and a{" "}
           <strong>match mode</strong> (exact vs phrase). The analyser searches
-          page content and anchors for that keyword and classifies how well the
-          page already supports linking to the destination.
+          stripped <strong>body text</strong> and <strong>in-body anchors</strong>{" "}
+          (after removing chrome described below). When a page has real{" "}
+          <code className="text-slate-400">&lt;p&gt;</code> blocks, a hit usually
+          needs to appear in paragraph copy that passes an editorial-quality
+          check—matches only in thin UI blobs (e.g. long “Refine by…” lists) tend
+          to be treated as <strong>Keyword not found</strong>.
         </p>
+      </section>
+
+      <section id="content" className="scroll-mt-28 space-y-3">
+        <h2 className="text-lg font-semibold text-slate-100">
+          Page content & links
+        </h2>
+        <ul className="list-disc space-y-2 pl-5 text-sm text-slate-300">
+          <li>
+            Extraction starts from <code className="text-slate-400">main</code>,{" "}
+            <code className="text-slate-400">article</code>, or{" "}
+            <code className="text-slate-400">body</code>.{" "}
+            <code className="text-slate-400">header</code>,{" "}
+            <code className="text-slate-400">footer</code>,{" "}
+            <code className="text-slate-400">nav</code>, and{" "}
+            <code className="text-slate-400">aside</code> are removed, then
+            typical <strong>facet / filter</strong> regions and{" "}
+            <strong>breadcrumb</strong> blocks inside the remainder—so
+            “breadcrumb link only” text does not drive keyword hits.
+          </li>
+          <li>
+            <strong>Crawl discovery</strong> still collects every internal{" "}
+            <code className="text-slate-400">href</code> in that main tree{" "}
+            <em>before</em> those strips, so category URLs from crumbs or filters
+            are not skipped when building the crawl queue.
+          </li>
+          <li>
+            <strong>“Strong link” / “Weak anchor” / “Linked to different URL”</strong>{" "}
+            use anchors that remain <em>after</em> the same strip. A link that
+            exists only in a removed breadcrumb or facet bar does{" "}
+            <strong>not</strong> count as the page already linking in the body—
+            you can still get an <strong>Opportunity found</strong> if the
+            keyword appears in real copy and body context passes the checks.
+          </li>
+        </ul>
       </section>
 
       <section id="results" className="scroll-mt-28 space-y-3">
@@ -131,6 +172,7 @@ export default function HowItWorksPage() {
           Each row is a combination of keyword, source page, and destination.
           Statuses include: opportunity found, strong link, weak anchor, keyword
           not found, linked to a different URL, source equals destination, etc.
+          Snippets aim to show <strong>body</strong> context, not removed chrome.
           See the results table for the exact label on each row.
         </p>
       </section>
@@ -179,10 +221,13 @@ export default function HowItWorksPage() {
           Run history & compare
         </h2>
         <p className="text-sm text-slate-300">
-          Completed runs are saved in <strong>browser localStorage</strong>. Open{" "}
-          <strong>Run history</strong> from the header to load past results or
-          compare two saved runs. Use <strong>CSV / JSON export</strong> from the
-          results table to keep snapshots outside the browser.
+          By default, completed runs are saved in <strong>browser localStorage</strong>.{" "}
+          Open <strong>Run history</strong> from the header to load past results or
+          compare two saved runs. If the host enables{" "}
+          <code className="text-slate-400">CRAWL_SERVER_SAVE_ENABLED</code>{" "}
+          (see README), successful analyses can also be archived on the server
+          (Redis or disk). Use <strong>CSV / JSON export</strong> from the results
+          table to keep snapshots under your own control.
         </p>
       </section>
 
@@ -209,10 +254,12 @@ export default function HowItWorksPage() {
       <section id="privacy" className="scroll-mt-28 space-y-3">
         <h2 className="text-lg font-semibold text-slate-100">Data & limits</h2>
         <p className="text-sm text-slate-300">
-          Presets live only in this browser unless you export or copy them.
-          Clearing site data removes them. Crawling third-party sites should
-          follow their terms and robots rules; this tool is intended for sites
-          you are allowed to crawl.
+          Presets and client-side run history live only in this browser unless you
+          export or copy them. Clearing site data removes them. If you use{" "}
+          <strong>Search Console API</strong> sign-in, refresh tokens are stored
+          on the server (encrypted) when that integration is configured. Crawling
+          third-party sites should follow their terms and robots rules; this tool
+          is intended for sites you are allowed to crawl.
         </p>
       </section>
     </div>
