@@ -21,11 +21,24 @@ function parseRobotsDirectives($: cheerio.CheerioAPI): RobotsDirectives {
   return directives;
 }
 
-function extractMainContent($: cheerio.CheerioAPI) {
-  const main = $("main");
-  if (main.length) return main;
-  const article = $("article");
+/**
+ * Region used for body text, paragraph blocks, and in-body internal anchors (not the full chrome shell).
+ * Many SFCC / Demandware sites use &lt;div role="main" id="maincontent"&gt; instead of &lt;main&gt;.
+ */
+function extractEditorialContentRoot($: cheerio.CheerioAPI): Cheerio<AnyNode> {
+  const mainEl = $("main").first();
+  if (mainEl.length) return mainEl;
+  const landmark = $('[role="main"]').first();
+  if (landmark.length) return landmark;
+  const mainContent = $("#maincontent").first();
+  if (mainContent.length) return mainContent;
+  const article = $("article").first();
   if (article.length) return article;
+  return $("body");
+}
+
+/** Full page (minus global chrome) for crawl &lt;a&gt; discovery — keeps header/footer-stripped body. */
+function extractLinkScopeRoot($: cheerio.CheerioAPI): Cheerio<AnyNode> {
   return $("body");
 }
 
@@ -269,6 +282,26 @@ function stripBreadcrumbLikeCompactBlocks(
   }
 }
 
+/**
+ * PLP title echoes category keywords; horizontal "shop subcategories" rails look like breadcrumbs to analysts.
+ * Strip only common listing-page wrappers so PDP / editorial pages are largely untouched.
+ */
+function stripPlpHeadingAndCategoryRail(root: Cheerio<AnyNode>): void {
+  root
+    .find(
+      [
+        ".row.plp-title-container",
+        ".plp-title-container",
+        ".header-cat-container",
+        ".cat-list.horizontal-scrollbar",
+        '[class*="plp-subcategory"]',
+        '[class*="category-ribbon"]',
+        '[data-widget="subcategory-navigation"]'
+      ].join(", ")
+    )
+    .remove();
+}
+
 export function extractPageData(
   url: string,
   html: string,
@@ -284,19 +317,20 @@ export function extractPageData(
   const canonicalHref = $('link[rel="canonical"]').attr("href") || null;
   const canonicalUrl = canonicalHref ? normaliseUrl(canonicalHref, url) : null;
 
-  const main = extractMainContent($);
+  const linkScope = extractLinkScopeRoot($);
+  const editorialRoot = extractEditorialContentRoot($);
 
   const linkBase = getLinkResolutionBase(html, url);
 
-  main.find("header, footer, nav, aside").remove();
-  main.find("script, style, noscript").remove();
+  linkScope.find("header, footer, nav, aside").remove();
+  linkScope.find("script, style, noscript").remove();
 
   /**
-   * Crawl frontier: every internal href in main (including breadcrumb / facets) so we don’t miss URLs.
-   * Anchor classification uses a second pass *after* stripping non-body UI (below).
+   * Crawl frontier: internal hrefs from the cleaned page shell (includes PLP filters, category rails, etc.).
+   * In-body anchor classification uses `editorialRoot` after stripping non-editorial UI.
    */
   const outgoingInternalLinks = new Set<string>();
-  main.find("a[href]").each((_, el) => {
+  linkScope.find("a[href]").each((_, el) => {
     const href = $(el).attr("href");
     if (!href || shouldIgnoreHref(href)) return;
     const absolute = normaliseUrl(href, linkBase);
@@ -306,11 +340,12 @@ export function extractPageData(
     outgoingInternalLinks.add(absolute);
   });
 
-  stripFacetedFilterRegions(main);
-  stripBreadcrumbRegions(main, $);
+  stripFacetedFilterRegions(editorialRoot);
+  stripBreadcrumbRegions(editorialRoot, $);
+  stripPlpHeadingAndCategoryRail(editorialRoot);
 
   const internalAnchors: { href: string; text: string }[] = [];
-  main.find("a[href]").each((_, el) => {
+  editorialRoot.find("a[href]").each((_, el) => {
     const href = $(el).attr("href");
     if (!href || shouldIgnoreHref(href)) return;
     const absolute = normaliseUrl(href, linkBase);
@@ -323,13 +358,13 @@ export function extractPageData(
     }
   });
 
-  const bodyText = cleanText(main.text());
+  const bodyText = cleanText(editorialRoot.text());
 
-  const mainWithoutAnchors = main.clone();
+  const mainWithoutAnchors = editorialRoot.clone();
   mainWithoutAnchors.find("a").remove();
   const bodyTextWithoutAnchors = cleanText(mainWithoutAnchors.text());
 
-  const mainForBlocks = main.clone();
+  const mainForBlocks = editorialRoot.clone();
   mainForBlocks.find("header, footer, nav, aside").remove();
   mainForBlocks.find("script, style, noscript").remove();
   mainForBlocks.find("a").remove();
